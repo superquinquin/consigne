@@ -4,4 +4,11 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "attrs>=25.1.0",
+    "erppeek>=1.7.1",
+    "pillow==9.5.0",
+    "python-barcode>=0.15.1",
+    "sanic>=24.12.0",
+    "sanic-ext>=23.12.0",
+]
