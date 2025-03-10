@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+from contextlib import ContextDecorator
 from datetime import datetime
 from functools import wraps, lru_cache
 from http.client import CannotSendRequest
@@ -63,11 +64,17 @@ class OdooConnector(object):
             raise ConnectionError("Unable to generate an Odoo Session")
         return OdooSession(client)
 
-class OdooSession(object):
+class OdooSession(ContextDecorator):
     client: Client
 
     def __init__(self, client: Client):
         self.client = client
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, exc_tb):
+        del self
 
     @resilient(degree=3)
     def get(self, model: str, conditions: Conditions) -> Record:
@@ -107,7 +114,7 @@ class OdooSession(object):
         tmpl = product_return.product_tmpl_id
         return (product_return.id, tmpl.name, True, tmpl.list_price)
 
-    def auth_provider(self, username: str, password: str) -> tuple[bool, Record]:
+    def auth_provider(self, username: str, password: str) -> tuple[bool, Record|None]:
         c = Client(self.client._server, verbose=False)
         auth = c._auth(self.client._db, username, password)
         if auth[0] is False:
@@ -115,9 +122,13 @@ class OdooSession(object):
         user = self.get("res.users", [("id", "=", auth[0])])
         return (True, user)
 
-    def provider_to_record(self, user: Record) -> tuple:
+    def user_to_record(self, user: Record) -> tuple:
         partner = user.partner_id
-        return (partner.name, partner.barcode_base)
+        return (partner.id, partner.barcode_base, partner.name)
+    
+    def get_partner_record_from_code(self, code: int) -> tuple:
+        partner = self.get("res.partner", [("barcode_base", "=", code)])
+        return (partner.id, partner.barcode_base, partner.name)
     
     def fuzzy_user_search(self, value: str) -> list[tuple[int, str]]:
         """return list of users close from the given value. 
