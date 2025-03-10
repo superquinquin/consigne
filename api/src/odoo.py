@@ -163,13 +163,4 @@ class OdooSession(ContextDecorator):
             dist = None
         return dist
 
-
-if __name__ == "__main__":
-    host = os.environ.get("ERP_URL", None)
-    database = os.environ.get("ERP_DB", None)
-    connector = OdooConnector(host, database, False)
-    with connector.make_session() as session:
-        product = session.get_product_from_barcode("3770000661170")
-        print(product)
-
     
