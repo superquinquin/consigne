@@ -24,7 +24,7 @@ TABLE_NAMES = "SELECT name FROM sqlite_master WHERE type='table';"
 TABLE_INFO = "PRAGMA table_info({table_name});"
 FK_INFO = "PRAGMA foreign_key_list({table_name});"
 
-WRITE = "INSERT {on_conflict} INTO {table_name}({columns}) VALUES({values}) {returning};"
+WRITE = "INSERT {on_conflict} INTO {table_name}({fields}) VALUES({values}) {returning};"
 UPDATE = "UPDATE {table_name} SET {setter} {conditions};"
 DELETE = "DELETE FROM {table_name} {conditions};"
 READ_ONE = "SELECT {fields} FROM {table_name} {joins} {conditions} {order} {axis};"
@@ -68,7 +68,7 @@ class OnConflict(str, Enum):
     def sql(self) -> str:
         if self.value == "none":
             return ""
-        return f"OR {str(self).upper()}"
+        return f"OR {str(self.value).upper()}"
 
 def intOrNone(instance, attribute, value):
     if value is None:
@@ -119,6 +119,14 @@ class Schema(object):
         fields = {info[1]:Field.from_pragma(info) for info in pragma}
         return cls(name, fields, {})
     
+    @property
+    def fields_name(self) -> list[str]:
+        return list(self.fields.keys())
+
+    def select_all(self) -> list[str]:
+        return [f"{self.name}.{fname}" for fname in self.fields_name]
+
+
     def is_joingnable(self, table_name: str) -> bool: 
         table = self.relations.get(table_name, None)
         return bool(table)
@@ -127,7 +135,7 @@ class Schema(object):
         if self.is_joingnable(table_name) is False:
             raise ValueError(f"{table_name} cannot be joined")
         table = self.relations.get(table_name)
-        return table.join()
+        return table.join
 
 @define(kw_only=True, slots=False, frozen=True)
 class Namespace:
@@ -143,8 +151,16 @@ class Namespace:
         return f"{self.table}.{self.fname}"
 
     def where(self, op: str, values: Any) -> tuple[str, Any]:
-        fname, op, values = self._prepare(op, values)
-        return ((f"{fname} {op} {self._set_anchor(op, values)}", values))
+        # fname, op, values = self._prepare(op, values)
+        return ((f"{self.fname} {op} {self._set_anchor(op, values)}", values))
+
+    def _set_anchor(self, op: str, values: Any) -> str:
+        if op.lower() == "in" and isinstance(values, list):
+            return f"({' ,'.join(['?' for _ in range(len(values))])})"
+        elif op.lower() == "in" and not isinstance(values, list):
+            return "(?)"
+        else:
+            return "?"
 
 @define(kw_only=True)
 class SimpleSqlConverter:
@@ -173,9 +189,9 @@ class SimpleSqlConverter:
 
         stmt = WRITE.format(
                 table_name= self.table_name,
-                column=self._parse_fields(),
+                fields= ", ".join(self.fields), #self._parse_fields()
                 values=self._anchors(self.values),
-                on_conflict=self.on_conflict,
+                on_conflict=self._parse_conflict_handling(),
                 returning=self._parse_returning()
             )
         return (stmt, self.values)
@@ -244,9 +260,11 @@ class SimpleSqlConverter:
                 return []
             if isinstance(sequence[0], Sequence) and not isinstance(sequence[0], str):
                 fields = [s[0] for s in sequence] # considering simple conditions formating
+            else:
+                fields = sequence
             buff = []
             for fname in fields:
-                if fname == "*":
+                if fname == "*" or fname in from_table.fields_name:
                     continue
                 namespace = self.namespaces.get(fname, None)
                 if namespace is None:
@@ -255,17 +273,19 @@ class SimpleSqlConverter:
                 buff.append(table)
             return buff
 
-        tables_to_join, join, joined_tables = [], [], [self.table_name]
+        tmp, tables_to_join, join, joined_tables = [], [], [], [self.table_name]
 
+        from_table = self.schemas.get(self.table_name)
         [tables_to_join.extend(_parse_sequence(s)) for s in [self.fields, self.order_by, self.conditions]]
-        tables_to_join = deque(list(set(tables_to_join)))
+        [tmp.append(s) for s in tables_to_join if (s  not in tmp and s.name != self.table_name)]        
+        tables_to_join = deque(tmp)
 
         loop_size, joined_size, iter_number = len(tables_to_join), len(joined_tables), 0
         while len(tables_to_join) > 0:
             table = tables_to_join.popleft()
 
             _joined, inplace_table_names = False, deque(joined_tables)
-            while _joined is False or len(inplace_table_names) == 0:
+            while len(inplace_table_names) > 0:
                 inplace_table_name = inplace_table_names.popleft()
                 inplace_table = self.schemas.get(inplace_table_name, None)
 
@@ -273,9 +293,10 @@ class SimpleSqlConverter:
                     raise ValueError(f"Unknown table: {table.name}")
                 
                 if table.is_joingnable(inplace_table.name):
-                    join.append(table.join(inplace_table))
-                    joined_tables.append(table)
+                    join.append(table.join(inplace_table.name))
+                    joined_tables.append(table.name)
                     _joined = True
+                    break
 
             if _joined is False:
                 tables_to_join.append(table)
@@ -283,7 +304,7 @@ class SimpleSqlConverter:
             iter_number += 1
             if iter_number == loop_size:
                 loop_size, iter_number = len(tables_to_join), 0
-                if joined_size == len(joined_size):
+                if joined_size == len(joined_tables):
                     break
                 joined_size = len(joined_tables)
 
@@ -315,9 +336,9 @@ class SimpleSqlConverter:
                 values.append(val)
         return ("WHERE " + ' AND '.join(conditions), values)
 
-    def _parse_setter(self, set_values: list[tuple[str, Any]]) -> tuple[str, Any]:
+    def _parse_setter(self) -> tuple[str, Any]:
         values, fields = [], []
-        for fname, val in set_values:
+        for fname, val in self.setter:
             namespace = self.namespaces.get(fname, None)
             if namespace is None:
                 raise KeyError(f"Unknown field name: {fname}")
@@ -326,7 +347,8 @@ class SimpleSqlConverter:
         return (", ".join(fields), values)
 
     def _parse_fields(self) -> str:
-        fields = ["*"]
+        
+
         if self.fields is not None:
             fields = []
             for fname in self.fields:
@@ -334,6 +356,9 @@ class SimpleSqlConverter:
                 if namespace is None:
                     raise KeyError(f"Unknown field name: {fname}")
                 fields.append(namespace.select())
+        else:
+            table = self.schemas.get(self.table_name)
+            fields = table.select_all()
         return ", ".join(fields)
 
     def _parse_conflict_handling(self) -> str:
@@ -374,8 +399,8 @@ class SimpleSqlConverter:
             namespace = self.namespaces.get(field, None)
             if namespace is None:
                 raise ValueError(f"Unknown field: {field}")
-            returning.append(namespace.select())
-        return ", ".join(returning)
+            returning.append(field) # namespace.select()
+        return "RETURNING " + ", ".join(returning)
 
     @staticmethod
     def _condition_anchors(op: str, values: Any) -> str:
@@ -425,6 +450,7 @@ class LiteORM:
         register_converter(SqlExtraDtypes.JSON.value, self._json_deserializer)
         register_converter(SqlExtraDtypes.JSONLIST.value, self._json_deserializer)
         register_converter(SqlExtraDtypes.DATETIME.value, self._datetime_deserializer)
+        register_converter("BOOL", lambda x: bool(int(x)))
 
     @property
     def uri(self) -> str:
@@ -436,7 +462,7 @@ class LiteORM:
     def write_one(
         self, 
         table_name: str, 
-        columns: list[str], 
+        fields: list[str], 
         values: list[Any],
         returning: list[str]|None = None, 
         on_conflict:OnConflict=OnConflict.Ignore, 
@@ -446,17 +472,17 @@ class LiteORM:
             schemas=self.schemas,
             namespaces=self.namespaces,
             table_name=table_name,
-            fields=columns,
+            fields=fields,
             values=values,
             on_conflict=on_conflict,
             returning=returning
-        )
+        ).write()
         return self._execute(stmt, payload, commit)
 
     def write_many(
         self, 
         table_name: str, 
-        columns: list[str], 
+        fields: list[str], 
         values: list[list[Any]], 
         returning: list[str]|None = None,
         on_conflict:OnConflict=OnConflict.Ignore, 
@@ -466,7 +492,7 @@ class LiteORM:
             schemas=self.schemas,
             namespaces=self.namespaces,
             table_name=table_name,
-            fields=columns,
+            fields=fields,
             values=values,
             on_conflict=on_conflict,
             returning=returning
@@ -553,7 +579,7 @@ class LiteORM:
         return self.cursor.execute(FK_INFO.format(table_name=table_name)).fetchall()
 
     def _execute(self, stmt: str, payload: list[Any], commit: bool=True) -> list[Any]|None:
-        res = self.con.execute(stmt, payload).fetchall()
+        res = self.con.execute(stmt, payload).fetchone()
         if commit:
             self.con.commit()
         return res
@@ -569,12 +595,15 @@ class LiteORM:
         for name in self.get_tables_names():
             info = self.get_table_info(name)
             fk_info = self.get_table_fk_info(name)
+            fk_names = [f[3] for f in fk_info]
+
             for fk in fk_info:
                 _, _, related_table, table_field, related_field, _,_,_ = fk
                 relations.append(FKRelation(name, table_field, related_table, related_field))
 
             for pragma in info:
-                namespaces.update({pragma[1]: Namespace.from_pragma(name, pragma)})
+                if namespaces.get(pragma[1], None) is None and pragma[1] not in fk_names:
+                    namespaces.update({pragma[1]: Namespace.from_pragma(name, pragma)})
 
             schema = Schema.from_pragma(name, info)
             schemas.update({name: schema})
@@ -602,62 +631,138 @@ class LiteORM:
         return json.loads(data)
 
     @staticmethod
-    def _datetime_serializer(dt: datetime) -> dict[str, Any] | list[Any]:
+    def _datetime_serializer(dt: datetime) -> str:
         return dt.isoformat("-")
 
     @staticmethod
-    def _datetime_deserializer(dt: str) -> dict[str, Any] | list[Any]:
-        return datetime.fromisoformat(dt)
+    def _datetime_deserializer(dt: str) -> str:
+        return dt.decode("utf-8")
+        # return datetime.fromisoformat(dt.decode("utf-8"))
     
 
 
 class ConsigneDatabase(LiteORM):
     def __init__(self, path = ":memory:", timeout = 5, **params):
         super().__init__(path, timeout, **params)
-
-    def add_product(self, opid: int, name: str, barcode: str, returnable: bool, return_value: float|None=None) -> int:
+    
+    # -- PRODUCT & PRODUCT RETURN
+    def add_product(self, opid: int, name: str, barcode: str, return_product_id: int) -> dict[str, Any]:
         pid = self.write_one(
             "products",
-            ["odoo_product_id", "product_name", "barcode", "returnable", "return_value"],
-            [opid, name, barcode, returnable, return_value]
+            ["odoo_product_id", "product_name", "barcode", "product_return_id"],
+            [opid, name, barcode, return_product_id],
+            returning=["product_id"]
+        )
+        return pid
+    
+    def add_product_return(self, opid: int, name: str, returnable: bool, return_value: float) -> dict[str, Any]:
+        pid = self.write_one(
+            "product_returns", 
+            ["odoo_product_return_id", "product_return_name", "returnable", "return_value"],
+            values=[opid, name, returnable, return_value],
+            returning=["product_return_id"]
         )
         return pid
 
-    def add_deposit(self, receiver_id: int, provider_id: int) -> int: 
+
+    def get_product_from_opid(self, opid: int) -> dict[str, Any]:
+        return self.read_one(
+            "products",
+            conditions=[("odoo_product_id", "=", opid)]
+        )
+
+    def get_return_product_from_opid(self, opid: int) -> dict[str, Any]:
+        return self.read_one(
+            "product_returns",
+            conditions=[("odoo_product_return_id", "=", opid)]
+        )
+
+
+    # -- DEPOSIT & DEPOSIT LINES
+    def add_deposit(self, receiver_id: int, provider_id: int) -> dict[str,Any]: 
         pid = self.write_one(
             "deposits",
-            ["receiver_id", "provider_id", "deposit_datetime"],
-            [receiver_id, provider_id, datetime.now()]
+            ["receiver_id", "provider_id", "deposit_datetime", "closed"],
+            [receiver_id, provider_id, datetime.now(), False],
+            returning=["deposit_id"]
         )
         return pid
     
-    def add_deposit_line(self, deposit_id: int, product_id: int, canceled: bool=False) -> int: 
+    def add_deposit_line(self, deposit_id: int, product_id: int, canceled: bool=False) -> dict[str,Any]: 
         pid = self.write_one(
-            "deposits_lines",
+            "deposit_lines",
             ["deposit_id", "product_id", "deposit_line_datetime", "canceled"],
-            [deposit_id, product_id, datetime.now(), canceled]
+            [deposit_id, product_id, datetime.now(), canceled],
+            returning=["deposit_line_id"]
         )
         return pid
     
-    def add_user(self, code: int) -> int:
+    def cancel_returned_product(self, deposit_id: int, deposit_line_id:int) -> None:
+        self.update(
+            "deposit_lines", 
+            [("canceled", True)], 
+            [
+                ("deposit_line_id", "=", deposit_line_id),
+                ("deposit_id", "=", deposit_id),
+            ]
+        )
+
+    # -- USERS
+    def add_user(self, partner_id: int, code: int, name: str) -> dict[str,Any]:
         pid = self.write_one(
             "users",
-            ["user_code", "last_provider_activity", "last_receiver_activity"],
-            [code, None, None]
+            ["user_partner_id", "user_code", "user_name", "last_provider_activity", "last_receiver_activity"],
+            [partner_id, code, name, None, None],
+            returning=["user_id"]
         )
         return pid
 
-    def update_activity(self, code: int, activity_as: Literal["provider", "receiver"]) -> None:
+    def update_activity(self, user_id: int, activity_as: Literal["provider", "receiver"]) -> None:
         activity_field = f"last_{activity_as}_activity"
         self.update(
             "users",
             [(activity_field, datetime.now())],
-            [("user_code", "=", code)]
+            [("user_id", "=", user_id)]
         )
 
-    def get_user(self, code: int) -> dict[str, Any] | None: ...
-    def get_product(self, opid: int) -> dict[str, Any] | None: ...
+    def get_user_from_code(self, code: int) -> dict[str, Any]|None:
+        return self.read_one("users", conditions=[("user_code", "=", code)])
 
+    # GLOBAL
+    def get_deposit_data(self, deposit_id: int) -> dict[str,Any]:
+        """
+        weakness of the current LiteOrm: does not rely on aliasing when joining tables.
+        `deposits` has 2 differents FK towards `users` table. LiteOrm should alias to return both fk fields..
+        Thus we currently use a more sequential approach, fetching both fk seperatly.
+        my bad.
+
+        provide full deposit data:
+            provider data
+            receiver data
+            deposit data
+            each deposit_lines data
+        """
+        deposit = self.read_one("deposits", conditions=[("deposit_id", "=", deposit_id)])
+        provider = self.read_one("users",fields=["user_code", "user_name"],conditions=[("user_id", "=", deposit.get("provider_id"))])
+        receiver = self.read_one("users",fields=["user_code", "user_name"], conditions=[("user_id", "=", deposit.get("receiver_id"))])
+        deposit_lines = self.read_many(
+            "deposit_lines",
+            fields=["deposit_line_id", "canceled", "deposit_line_datetime", "product_name", "barcode", "product_return_name", "returnable", "return_value"],
+            conditions=[("deposit_id", "=", deposit.get("deposit_id"))]
+        )
+        return {
+            "deposit": deposit,
+            "provider": provider,
+            "receiver": receiver,
+            "deposit_lines": deposit_lines
+        }
+
+    def get_deposit_line_data(self, deposit_id: int, deposit_line_id: int) -> dict[str, Any]:
+        return self.read_one(
+            "deposit_lines",
+            fields=["deposit_line_id", "canceled", "deposit_line_datetime", "product_name", "barcode", "product_return_name", "returnable", "return_value"],
+            conditions=[("deposit_id", "=", deposit_id), ("deposit_line_id", "=", deposit_line_id)]
+        )
 
 
 if __name__ == "__main__":
