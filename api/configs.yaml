@@ -1,0 +1,62 @@
+app:
+  env: ${ENV}
+  sanic:
+    static: ./src/static
+    app:
+      templating_enable_async: true
+      templating_path_to_templates: ./src/templates/
+
+  database:
+    path: database.db
+    timeout: 5
+
+  caching: ...
+
+  odoo:
+    login: ${ERP_USERNAME}
+    password: ${ERP_PASSWORD}
+    database: ${ERP_DB}
+    host: ${ERP_URL}
+    verbose: False
+
+  logging:
+    version: 1
+    disable_existing_loggers: False
+
+    formatters:
+      simple:
+        class: logging.Formatter
+        format: "[%(asctime)s][%(name)s][%(process)d][%(levelname)s] | %(message)s"
+        datefmt: "%d-%m-%Y %H:%M:%S"
+
+    handlers:
+      stream:
+        class: logging.StreamHandler
+        level: INFO
+        formatter: simple
+        stream: ext://sys.stdout
+
+      error_stream:
+        class: logging.StreamHandler
+        level: INFO
+        formatter: simple
+        stream: ext://sys.stderr
+
+      error_file:
+        class: logging.FileHandler
+        level: ERROR
+        formatter: simple
+        filename: ./volume/errors.log
+
+      access_file:
+        class: logging.FileHandler
+        level: INFO
+        formatter: simple
+        filename: ./volume/log.log
+
+    loggers:
+      endpointAccess:
+        level: INFO
+        handlers: [stream, error_file, access_file]
+        propagate: True
+
