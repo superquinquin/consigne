@@ -1,6 +1,8 @@
 CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY,
-    user_code TEXT UNIQUE NOT NULL,
+    user_partner_id INTEGER UNIQUE NOT NULL,
+    user_code INTEGER UNIQUE NOT NULL,
+    user_name TEXT NOT NULL,
     last_provider_activity DATETIME,
     last_receiver_activity DATETIME
 );
@@ -13,7 +15,7 @@ CREATE TABLE IF NOT EXISTS  deposits(
     closed BOOL NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS deposits_lines (
+CREATE TABLE IF NOT EXISTS deposit_lines (
     deposit_line_id INTEGER PRIMARY KEY,
     deposit_id INTEGER NOT NULL REFERENCES deposits(deposit_id),
     product_id INTEGER NOT NULL REFERENCES products(product_id),
@@ -26,23 +28,21 @@ CREATE TABLE IF NOT EXISTS products (
     odoo_product_id INTEGER UNIQUE NOT NULL,
     product_name TEXT,
     barcode TEXT NOT NULL,
-    product_type_id INTEGER NOT NULL REFERENCES product_types(product_type_id)
+    product_return_id INTEGER NOT NULL REFERENCES product_returns(product_return_id)
 );
 
-CREATE TABLE IF NOT EXISTS product_types (
-    product_type_id INTEGER PRIMARY KEY,
-    odoo_consigne_id INTEGER UNIQUE,
-    product_type_name TEXT NOT NULL,
+CREATE TABLE IF NOT EXISTS product_returns (
+    product_return_id INTEGER PRIMARY KEY,
+    odoo_product_return_id INTEGER UNIQUE,
+    product_return_name TEXT NOT NULL,
     returnable BOOL NOT NULL,
     return_value REAL
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_partner_id ON users(user_partner_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_codes ON users(user_code);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_opid ON products(odoo_product_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_return_opid ON product_returns(odoo_product_return_id);
 
-INSERT OR IGNORE INTO product_types (product_type_name, odoo_consigne_id, returnable, return_value)
-VALUES 
-    ("Non Retournable",0, false, NULL),
-    ("Bouteille 75cl",1, true, 0.20),
-    ("Bouteille 25cl",2, true, 0.10),
-    ("Bouteille gaz",3, true, 10.0);
+INSERT OR IGNORE INTO product_returns (product_return_name, odoo_product_return_id, returnable, return_value)
+VALUES ("Non Retournable", 0, false, NULL);
