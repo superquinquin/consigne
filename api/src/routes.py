@@ -117,5 +117,6 @@ async def cancel_returned_product(request: Request, deposit_id: int, deposit_lin
 @consigneBp.route("/deposit/<deposit_id:int>/ticket", methods=["GET"])
 async def get_ticket(request: Request, deposit_id: int) -> HTTPResponse:
     """Request to generate a ticket for a given deposit."""
-    raise NotImplementedError()
-
+    engine: ConsigneEngine = request.app.ctx.engine
+    res = engine.generate_ticket(deposit_id)
+    return json({"status": 200, "reasons": "OK", "data": {}})

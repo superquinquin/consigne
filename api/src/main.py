@@ -17,7 +17,9 @@ from src.middlewares import error_handler, go_fast, log_exit
 
 from src.odoo import OdooConnector
 from src.database import ConsigneDatabase
+from src.ticket import ConsignePrinter
 from src.engine import ConsigneEngine
+
 
 
 StrOrPath = str|Path
@@ -40,6 +42,7 @@ class Consigne:
         sanic: dict[str, Any],
         odoo: dict[str, Any],
         database: dict[str, Any],
+        printer: dict[str, Any],
         caching: dict[str, Any] | None = None,
         logging: dict[str, Any] | None = None,
         options: dict[str, Any] | None = None,
@@ -63,7 +66,8 @@ class Consigne:
 
         connector = OdooConnector(**odoo)
         consigne_database = ConsigneDatabase(**database)
-        engine = ConsigneEngine(connector, consigne_database)
+        consigne_printer = ConsignePrinter(**printer)
+        engine = ConsigneEngine(connector, consigne_database, consigne_printer)
         app.ctx.engine = engine
         consigne = cls(app, engine, env)
         return consigne.app

@@ -30,6 +30,21 @@ DELETE = "DELETE FROM {table_name} {conditions};"
 READ_ONE = "SELECT {fields} FROM {table_name} {joins} {conditions} {order} {axis};"
 READ_MANY = "SELECT {fields} FROM {table_name} {joins} {conditions} {order} {axis} {limit};"
 
+RETURNS_PER_PRODUCT_TYPE = """\
+SELECT 
+    product_returns.product_return_name, 
+    COUNT(deposit_line_id), 
+    SUM(product_returns.return_value) 
+FROM deposit_lines 
+JOIN products ON deposit_lines.product_id=products.product_id 
+JOIN product_returns ON products.product_return_id=product_returns.product_return_id 
+WHERE 
+    deposit_id = {deposit_id}
+    AND canceled = 0 
+    AND product_returns.product_return_id != 1
+GROUP BY products.product_return_id;
+"""
+
 
 class SqlExtraDtypes(str, Enum):
     DATETIME = "DATETIME"
@@ -682,8 +697,8 @@ class ConsigneDatabase(LiteORM):
     def add_deposit(self, receiver_id: int, provider_id: int) -> dict[str,Any]: 
         pid = self.write_one(
             "deposits",
-            ["receiver_id", "provider_id", "deposit_datetime", "closed"],
-            [receiver_id, provider_id, datetime.now(), False],
+            ["receiver_id", "provider_id", "deposit_datetime", "closed", "deposit_barcode"],
+            [receiver_id, provider_id, datetime.now(), False, None],
             returning=["deposit_id"]
         )
         return pid
@@ -706,7 +721,7 @@ class ConsigneDatabase(LiteORM):
                 ("deposit_id", "=", deposit_id),
             ]
         )
-
+    
     # -- USERS
     def add_user(self, partner_id: int, code: int, name: str) -> dict[str,Any]:
         pid = self.write_one(
@@ -763,6 +778,10 @@ class ConsigneDatabase(LiteORM):
             fields=["deposit_line_id", "canceled", "deposit_line_datetime", "product_name", "barcode", "product_return_name", "returnable", "return_value"],
             conditions=[("deposit_id", "=", deposit_id), ("deposit_line_id", "=", deposit_line_id)]
         )
+    
+    ## DEPOSITLINES SUMMARY
+    def get_returns_per_types(self, deposit_id) -> list[tuple[str, int, float]]:
+        return self.cursor.execute(RETURNS_PER_PRODUCT_TYPE.format(deposit_id=deposit_id)).fetchall()
 
 
 if __name__ == "__main__":
