@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS  deposits(
     receiver_id INTEGER NOT NULL REFERENCES users(user_id),
     provider_id INTEGER NOT NULL REFERENCES users(user_id),
     deposit_datetime DATETIME NOT NULL,
-    closed BOOL NOT NULL
+    closed BOOL NOT NULL,
+    deposit_barcode TEXT
 );
 
 CREATE TABLE IF NOT EXISTS deposit_lines (

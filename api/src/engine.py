@@ -2,18 +2,21 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.odoo import OdooConnector, OdooSession
+from src.odoo import OdooConnector
 from src.database import ConsigneDatabase
-
+from src.ticket import DepositTicket, ConsignePrinter
+from src.utils import generate_ean
 
 
 class ConsigneEngine(object):
     odoo: OdooConnector
     database: ConsigneDatabase
+    printer: ConsignePrinter
 
-    def __init__(self, odoo: OdooConnector, database: ConsigneDatabase):
+    def __init__(self, odoo: OdooConnector, database: ConsigneDatabase, printer: ConsignePrinter):
         self.odoo = odoo
         self.database = database
+        self.printer = printer
 
     def initialize_return(self, receiver_code: int, provider_code: int) -> int:
         """
@@ -118,14 +121,37 @@ class ConsigneEngine(object):
         self.database.update_activity(user_id, "provider")
         return {"auth": auth, "user": {"user_name": name, "user_code": code}}
         
-    def generate_ticket(self, deposit_id: int) -> ...:
+    def generate_ticket(self, deposit_id: int) -> None:
         """
         1. collect doposit & deposit_lines data
         2. build aggregated data for quantities and return values
         3. generate ticket
         4. return ticket in the printer accepted format
         """
-        ...
+        
+        deposit = self.database.read_one("deposits", conditions=[("deposit_id", "=", deposit_id)])
+        receiver_id = deposit.get("receiver_id")
+        ean = deposit.get("deposit_barcode", None)
+
+        receiver = self.database.read_one("users", fields=["user_code", "user_name"], conditions=[("user_id","=", receiver_id)])
+
+        returns_per_types = self.database.get_returns_per_types(deposit_id)
+        total_value = sum([r[2] for r in returns_per_types])
+
+        if ean is None:
+            ean = generate_ean(total_value)
+            self.database.update("deposits", [("deposit_barcode", ean)], conditions=[("deposit_id", "=", deposit_id)])
+
+        with self.printer.make_printer_session() as p:
+            p.print_ticket(
+                deposit_id=deposit_id,
+                **receiver,
+                returns_lines=returns_per_types,
+                total_value=total_value,
+                ean=ean
+            )
+
+
 
 
 
