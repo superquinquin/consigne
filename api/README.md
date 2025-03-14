@@ -10,7 +10,6 @@ Or using `boot.sh` systematically check and create if necessary the database bef
 ```bash
 bash boot.sh
 ```
-
 ### Configurations
 Consigne is configurated using a `yaml` file, generally called `configs.yaml`.
 this file can either be defined as the `path` argument of the `create_app` method in `asgi.py` 
@@ -25,8 +24,27 @@ Default configurations put all logs inside a `volume` folder. Before starting th
 mkdir volume
 ```
 
-### Running the server
-Run the following script:
+### Dev Setup
+Consigne api use [UV](https://docs.astral.sh/uv/) as it's depedencies manager.
+
 ```bash
+# Installing UV
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+on `./api` create and activate the virtual environment for the consigne api.
+```bash
+# Installing consigne dependencies from uv.lock
+uv sync
+
+# activate the virtual env
+source .venv/bin/activate
+```
+
+to boot consigne api
+```bash
+# Running the sanic server.
 bash boot.sh
 ```
+### Prod Setup
+...
