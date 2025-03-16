@@ -27,27 +27,20 @@
 import {useRouter} from "vue-router";
 
 const router = useRouter();
-import { ref } from 'vue'
+import {inject, ref} from 'vue'
+import AuthProvider from "@/services/authentication.ts";
+import {globalState} from "@/services/state.ts";
+
+const authProvider: typeof AuthProvider | undefined = inject('AuthProvider')
 
 const username = ref("")
 const password = ref("")
 
-function sleep(ms: number) {
-  console.log("Sleeping...")
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 const onSubmit = async () => {
-  const formData = new FormData();
-  formData.append("username", username.value);
-  formData.append("password", password.value);
+  const result = await authProvider?.authenticate(username.value, password.value);
 
-
-  const result = await fetch("/api/login", {method: 'POST',body: formData})
-    .then(()=> sleep(2000))
-    .catch(()=> sleep(2000));
-
-  if(true) {
+  if(result?.data.auth) {
+    globalState.receiverCode = result.data.user.user_code;
     await router.replace({ path: '/deposit' }).then(console.log).catch(console.log)
   }
 }

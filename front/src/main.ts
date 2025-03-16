@@ -6,6 +6,8 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import App from './App.vue'
 import Login from "./Login.vue";
 import Deposits from "@/Deposits.vue";
+import AuthProvider from "@/services/authentication.ts";
+import DepositProvider from "@/services/deposit.ts";
 
 const routes = [
   { path: '/', component: Login },
@@ -16,6 +18,12 @@ const router = createRouter({
   history: createMemoryHistory(),
   routes,
 })
-createApp(App)
-  .use(router)
+const app = createApp(App);
+
+// setup router
+app.use(router)
   .mount('#app')
+
+// provider services
+app.provide('AuthProvider', AuthProvider)
+app.provide('DepositProvider', DepositProvider)

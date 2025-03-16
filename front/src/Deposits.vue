@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import {reactive} from "vue";
+import {inject, reactive, ref} from "vue";
 import {useRouter} from "vue-router";
+import type Deposit from "@/services/deposit.ts";
+import {globalState} from "@/services/state.ts";
 
 const router = useRouter()
+const depositProvider: typeof Deposit = inject('DepositProvider')
+
+const providerCode = ref("");
 
 type Returnable = {
   name: string;
@@ -18,14 +23,24 @@ type DisplayedReturnable = {
 
 const mockupReturnable = ["1", "2", "3"];
 
-const state = reactive<{ returnGoods: Returnable[], barcode: string }>({
+const depositState = reactive<{ returnGoods: Returnable[], barcode: string, depositId?: number }>({
   returnGoods: [],
   barcode: ""
 })
 
-const currentTotalValue = () => state.returnGoods.reduce((acc, current) => acc + current.value, 0)
+const currentTotalValue = () => depositState.returnGoods.reduce((acc, current) => acc + current.value, 0)
 
 const queryForReturnable = async (barCode: string): Promise<Returnable | null> => {
+  const result = await depositProvider.addProduct(globalState.depositId, barCode);
+
+  console.log(result);
+
+  return {
+    name: barCode,
+    isReturnable: result.returnable,
+    value: result.value
+  };
+
   if (mockupReturnable.some(returnable => returnable === barCode)) {
     return {
       name: barCode,
@@ -38,20 +53,24 @@ const queryForReturnable = async (barCode: string): Promise<Returnable | null> =
 }
 
 const groupByBarcode = () =>
-    state.returnGoods.reduce<Record<string, DisplayedReturnable>>((acc, current) => {
-      acc[current.name] = {name: current.name, value: current.value + (acc[current.name]?.value || 0), quantity: (acc[current.name]?.quantity || 0)+1};
-      return acc;
-    }, {})
+  depositState.returnGoods.reduce<Record<string, DisplayedReturnable>>((acc, current) => {
+    acc[current.name] = {
+      name: current.name,
+      value: current.value + (acc[current.name]?.value || 0),
+      quantity: (acc[current.name]?.quantity || 0) + 1
+    };
+    return acc;
+  }, {})
 
 const onSubmit = async (event: KeyboardEvent) => {
   if (event.code === 'Enter') {
-    const returnable = await queryForReturnable(state.barcode);
+    const returnable = await queryForReturnable(depositState.barcode);
 
     if (returnable?.isReturnable) {
-      state.returnGoods = [...state.returnGoods, returnable]
+      depositState.returnGoods = [...depositState.returnGoods, returnable]
     }
 
-    state.barcode = "";
+    depositState.barcode = "";
   }
 }
 
@@ -60,7 +79,16 @@ const onPrint = async () => {
 }
 
 const onEnd = async () => {
-  await router.push({ path: "/" });
+  await router.push({path: "/"});
+}
+
+const createDeposit = async () => {
+  const result = await depositProvider
+    .create(parseInt(providerCode.value), globalState.receiverCode);
+
+  if (result.deposit_id) {
+    globalState.depositId = result.deposit_id;
+  }
 }
 </script>
 
@@ -70,29 +98,42 @@ const onEnd = async () => {
   </header>
 
   <main class="w-100 h-100">
-    <div class="flex flex-col gap-16">
 
-      <div class="wrapper">
-        <input v-model="state.barcode" v-on:keydown="onSubmit" placeholder="Scannez un produit"
-               autocomplete="off"/>
-      </div>
-
+    Global state : {{ JSON.stringify(globalState) }}
+    <br/>
+    <template v-if="!globalState.depositId">
       <div>
-        <ul>
-          <li v-for="value in groupByBarcode()">
-            {{ value.name }} - x{{value.quantity}} {{ value.value/10 }} euros
-          </li>
-        </ul>
-        Total : {{currentTotalValue()/10}}
-
+        <input class="bg-white text-black" v-model="providerCode" placeholder="Code utilisateur"
+               autocomplete="off"/>
+        <button @click="createDeposit" type="button">Commencer</button>
       </div>
+    </template>
 
+    <template v-else>
+      <div class="flex flex-col gap-16">
 
-      <div class="flex flex-row gap-8">
-        <button @click="onPrint" type="button">Print</button>
-        <button @click="onEnd" type="button">End deposit</button>
+        <div class="wrapper">
+          <input v-model="depositState.barcode" v-on:keydown="onSubmit"
+                 placeholder="Scannez un produit"
+                 autocomplete="off"/>
+        </div>
+
+        <div>
+          <ul>
+            <li v-for="value in groupByBarcode()">
+              {{ value.name }} - x{{ value.quantity }} {{ value.value / 10 }} euros
+            </li>
+          </ul>
+          Total : {{ currentTotalValue() / 10 }}
+
+        </div>
+
+        <div class="flex flex-row gap-8">
+          <button @click="onPrint" type="button">Print</button>
+          <button @click="onEnd" type="button">End deposit</button>
+        </div>
       </div>
-    </div>
+    </template>
   </main>
 </template>
 
