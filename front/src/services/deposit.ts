@@ -16,6 +16,10 @@ export type GetByIdAndLineIdResponse = {
 }
 
 export type AddProductResponse = {
+  deposit_line_id: number;
+  name: string;
+  odoo_product_id: number;
+  product_id: number;
   returnable: boolean;
   return_value?: number;
 }
