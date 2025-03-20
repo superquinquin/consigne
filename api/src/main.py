@@ -8,7 +8,7 @@ from sanic.log import LOGGING_CONFIG_DEFAULTS
 
 from pathlib import Path
 
-from typing import Any
+from typing import Any, Literal
 
 
 from src.parsers import get_config
@@ -17,7 +17,7 @@ from src.middlewares import error_handler, go_fast, log_exit
 
 from src.odoo import OdooConnector
 from src.database import ConsigneDatabase
-from src.ticket import ConsignePrinter
+from src.ticket import ConsignePrinter, UsbSettings, NetworkSettings
 from src.engine import ConsigneEngine
 
 
@@ -66,12 +66,11 @@ class Consigne:
 
         connector = OdooConnector(**odoo)
         consigne_database = ConsigneDatabase(**database)
-        consigne_printer = ConsignePrinter(**printer)
+        consigne_printer = cls.configurate_printer(**printer)
         engine = ConsigneEngine(connector, consigne_database, consigne_printer)
         app.ctx.engine = engine
         consigne = cls(app, engine, env)
         return consigne.app
-
 
     @classmethod
     def create_app(cls, path: StrOrPath|None=None) -> Sanic:
@@ -99,5 +98,17 @@ class Consigne:
         logging["formatters"].update(LOGGING_CONFIG_DEFAULTS["formatters"])
         return logging
     
+    @staticmethod
+    def configurate_printer(adapter: Literal["Usb", "Network"], settings: dict[str, Any]) -> ConsignePrinter:
+        def select_best():
+            scores, wrappers = [], [NetworkSettings, UsbSettings]
+            for wrapper in wrappers:
+                scores.append(sum([1 for k in wrapper.__annotations__.keys() if k in settings.keys()]))
+            best = max(scores)
+            return wrappers[scores.index(best)]
+        settings_wrapper = select_best()
+        return ConsignePrinter(adapter, settings_wrapper(**settings))
+
+
 if __name__ == "__main__":
     Consigne.create_app("configs.yaml")
