@@ -1,40 +1,67 @@
 from __future__ import annotations
+
+import sys
+from dataclasses import dataclass, field, asdict
+from abc import ABC
 from contextlib import ContextDecorator
 from escpos.printer import Usb, Network
 
 from datetime import datetime
-from functools import reduce
-import re
-import random
-from collections import deque
 
-from typing import Any
+from typing import Any, Optional, Type, Literal
 
 """
 BARCODE RULE EAN13: 999....{NNNDD}
 
 """
 
+Adapter = Literal["Usb", "Network"]
+
+
+@dataclass(frozen=True)
+class UsbSettings(object):
+    profile: str = field()
+    idVendor: Optional[int] | None = field(default=None)
+    idProduct: Optional[int] | None = field(default=None)
+    usb_args: Optional[dict[str, str|int]] | None = field(default=None)
+    timeout: int = field(default=60)
+    in_ep: Optional[int] = field(default=0x82) 
+    out_ep: Optional[int] = field(default=0x01) 
+
+@dataclass(frozen=True)
+class NetworkSettings(object):
+    host: str = field()
+    profile: str = field()
+    port: int = field(default=9100)
+    timeout: int = field(default=60)
+    
 class ConsignePrinter(object):
-    host: str
-    profile: str
-    options: dict[str, Any]
-    def __init__(self, host: str, profile: str, **kwargs):
-        self.host = host
-        self.profile = profile
-        self.options = kwargs
+    adapter: Adapter
+    settings: UsbSettings|NetworkSettings
 
-    def make_printer_session(self) -> DepositTicket:
-        return DepositTicket(self.host, profile=self.profile, **self.options)
+    def __init__(self, adapter: Adapter, settings: dict[str,Any]):
+        self.adapter = adapter
+        self.settings = settings
 
+    @property
+    def _adapter(self) -> Type[Usb|Network]:
+        module = sys.modules.get(__name__)
+        adapter = getattr(module, self.adapter, None)
+        if adapter is None:
+            raise ValueError(f"adapter must be either: [`Usb`, `Network`]")
+        return adapter
 
-class DepositTicket(Network, ContextDecorator):
+    @property
+    def _ticket(self) -> Type[DepositTicket]:
+        return type("Ticket", (DepositTicket, self._adapter), {})
+
+    def make_printer_session(self):
+        return self._ticket(**asdict(self.settings))
+
+class DepositTicket(ABC, ContextDecorator):
     BARCODE_RULE: str = "999....NNNDD"
     RETURN_LINE: str = "{quantity:<3d}X {name:.<20s}: {value:3.1f}€\n"
     TOTAL_LINE: str =  "Total{name:.<20s}: {value:3.1f}€\n"
-
-    def __init__(self, host = "", port = 9100, timeout = 60, *args, **kwargs):
-        super().__init__(host, port, timeout, *args, **kwargs)
 
     def __enter__(self):
         if not all([self.is_usable(), self.is_online()]):
@@ -42,7 +69,6 @@ class DepositTicket(Network, ContextDecorator):
         return self
 
     def __exit__(self, exc_type, exc, exc_tb):
-        self.cut()
         del self
 
     def print_ticket(
@@ -58,6 +84,7 @@ class DepositTicket(Network, ContextDecorator):
         self._ticket_body(returns_lines, total_value)
         self._ticket_barcode(ean)
         self._ticket_footer(deposit_id)
+        self.cut()
 
     def _ticket_header(self, user_code: str, user_name: str) -> None:
         self.set(align="center", bold=True, height=2, width=1, custom_size=True)

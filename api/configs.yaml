@@ -13,8 +13,21 @@ app:
   caching: ...
 
   printer:
-    host: 192.168.1.83
-    profile: TM-T20II
+    ## NETWORK ADAPTER CONFIGURATION EXAMPLE
+    adapter: Network
+    settings: 
+      host: 192.168.1.83
+      profile: TM-T20II
+
+    ## Usb ADAPTER CONFIGURATION EXAMPLE
+    # adapter: Usb
+    # settings:
+    #   profile: TM-T20II
+    #   idVendor: ...
+    #   idProduct: ...
+    #   in_ep: 0x82
+    #   out_ep: 0x01
+
 
   odoo:
     login: ${ERP_USERNAME}
