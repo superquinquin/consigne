@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS  deposits(
     provider_id INTEGER NOT NULL REFERENCES users(user_id),
     deposit_datetime DATETIME NOT NULL,
     closed BOOL NOT NULL,
-    deposit_barcode TEXT
+    deposit_barcode TEXT,
+    redeemed INTEGER REFERENCES redeem(redeem_id)
 );
 
 CREATE TABLE IF NOT EXISTS deposit_lines (
@@ -40,10 +41,20 @@ CREATE TABLE IF NOT EXISTS product_returns (
     return_value REAL
 );
 
+CREATE TABLE IF NOT EXISTS redeem (
+    redeem_id INTEGER PRIMARY KEY,
+    odoo_pos_id INTEGER NOT NULL,
+    redeem_datetime DATETIME NOT NULL,
+    redeem_user INTEGER NOT NULL REFERENCES users(user_id),
+    redeem_value INTEGER NOT NULL,
+    redeem_barcode TEXT NOT NULL,
+    anomaly BOOL NOT NULL
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_partner_id ON users(user_partner_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_codes ON users(user_code);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_opid ON products(odoo_product_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_return_opid ON product_returns(odoo_product_return_id);
 
 INSERT OR IGNORE INTO product_returns (product_return_name, odoo_product_return_id, returnable, return_value)
-VALUES ("Non Retournable", 0, false, NULL);
+VALUES ("Non Retournable", 0, false, NULL), ("Réutilisable", 1, true, 0.0);
