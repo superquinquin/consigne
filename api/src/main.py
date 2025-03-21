@@ -66,7 +66,7 @@ class Consigne:
 
         connector = OdooConnector(**odoo)
         consigne_database = ConsigneDatabase(**database)
-        consigne_printer = cls.configurate_printer(**printer)
+        consigne_printer = ConsignePrinter.from_configs(**printer)
         engine = ConsigneEngine(connector, consigne_database, consigne_printer)
         app.ctx.engine = engine
         consigne = cls(app, engine, env)
@@ -97,18 +97,6 @@ class Consigne:
         logging["handlers"].update(LOGGING_CONFIG_DEFAULTS["handlers"])
         logging["formatters"].update(LOGGING_CONFIG_DEFAULTS["formatters"])
         return logging
-    
-    @staticmethod
-    def configurate_printer(adapter: Literal["Usb", "Network"], settings: dict[str, Any]) -> ConsignePrinter:
-        def select_best():
-            scores, wrappers = [], [NetworkSettings, UsbSettings]
-            for wrapper in wrappers:
-                scores.append(sum([1 for k in wrapper.__annotations__.keys() if k in settings.keys()]))
-            best = max(scores)
-            return wrappers[scores.index(best)]
-        settings_wrapper = select_best()
-        return ConsignePrinter(adapter, settings_wrapper(**settings))
-
 
 if __name__ == "__main__":
     Consigne.create_app("configs.yaml")

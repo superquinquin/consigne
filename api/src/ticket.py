@@ -8,7 +8,7 @@ from escpos.printer import Usb, Network
 
 from datetime import datetime
 
-from typing import Any, Optional, Type, Literal
+from typing import Any, Optional, Type, Literal, get_args
 
 """
 BARCODE RULE EAN13: 999....{NNNDD}
@@ -39,7 +39,7 @@ class ConsignePrinter(object):
     adapter: Adapter
     settings: UsbSettings|NetworkSettings
 
-    def __init__(self, adapter: Adapter, settings: dict[str,Any]):
+    def __init__(self, adapter: Adapter, settings: UsbSettings|NetworkSettings):
         self.adapter = adapter
         self.settings = settings
 
@@ -52,11 +52,22 @@ class ConsignePrinter(object):
         return adapter
 
     @property
-    def _ticket(self) -> Type[DepositTicket]:
+    def _printer(self) -> Type[DepositTicket]:
         return type("Ticket", (DepositTicket, self._adapter), {})
 
+    @classmethod
+    def from_configs(cls, adapter: Adapter, settings: dict[str, Any]) -> ConsignePrinter:
+        if adapter not in get_args(Adapter):
+            raise ValueError(f"adapter must be either: [`Usb`, `Network`]")
+        match adapter:
+            case "Usb":
+                printer_settings = UsbSettings(**settings)
+            case "Network":
+                printer_settings = NetworkSettings(**settings)
+        return cls(adapter, printer_settings)
+
     def make_printer_session(self):
-        return self._ticket(**asdict(self.settings))
+        return self._printer(**asdict(self.settings))
 
 class DepositTicket(ABC, ContextDecorator):
     BARCODE_RULE: str = "999....NNNDD"
@@ -124,3 +135,4 @@ class DepositTicket(ABC, ContextDecorator):
         self.text("Bon pour une Bière gratuite !\n")
         self.text("\n")
         self.qr("https://www.youtube.com/watch?v=dQw4w9WgXcQ", size=10)
+        self.cut()
