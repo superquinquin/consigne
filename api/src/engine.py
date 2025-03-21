@@ -113,13 +113,14 @@ class ConsigneEngine(object):
             if auth is False:
                 return {"auth": auth, "user": None}
             oid, code, name = session.user_to_record(user)
+            end_shift_dist = session.get_current_shift_end_time_dist()
         db_user = self.database.get_user_from_code(code)
         if db_user is None:
             db_user = self.database.add_user(oid, code, name)
 
         user_id = db_user.get('user_id')
         self.database.update_activity(user_id, "provider")
-        return {"auth": auth, "user": {"user_name": name, "user_code": code}}
+        return {"auth": auth, "user": {"user_name": name, "user_code": code, "max_age":end_shift_dist}}
         
     def generate_ticket(self, deposit_id: int) -> None:
         """
@@ -151,11 +152,11 @@ class ConsigneEngine(object):
                 ean=ean
             )
 
-
-
-
-
     def search_user(self, value: str) -> list[tuple[int, str]]:
         """fuzzy search for the user."""
-        ...
-    
+        with self.odoo.make_session() as session:
+            res = session.fuzzy_user_search(value)
+        return res
+
+    def close_deposit(self, deposit_id: int) -> None:
+        self.database.close_deposit(deposit_id)

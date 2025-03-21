@@ -120,3 +120,23 @@ async def get_ticket(request: Request, deposit_id: int) -> HTTPResponse:
     engine: ConsigneEngine = request.app.ctx.engine
     res = engine.generate_ticket(deposit_id)
     return json({"status": 200, "reasons": "OK", "data": {}})
+
+
+@consigneBp.route("/deposit/<deposit_id:int>/close", methods=["GET"])
+async def close_deposit(request: Request, deposit_id: int) -> HTTPResponse:
+    engine: ConsigneEngine = request.app.ctx.engine
+    res = engine.close_deposit(deposit_id)
+    return json({"status": 200, "reasons": "OK", "data": {}})
+
+@consigneBp.route("/search-user", methods=["POST"])
+async def search_user(request: Request) -> HTTPResponse:
+    """
+    POST {'input': int|str}
+    return (list[tuple(int, str)]): list of user_code, user_name of X partially matching given output
+    """
+    payload = request.load_json()
+    inp = payload.get("input", None)
+
+    engine: ConsigneEngine = request.app.ctx.engine
+    res = engine.search_user(inp)
+    return json({"status": 200, "reasons": "OK", "data": {"matches": res}})

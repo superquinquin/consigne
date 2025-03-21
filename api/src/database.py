@@ -703,6 +703,9 @@ class ConsigneDatabase(LiteORM):
         )
         return pid
     
+    def close_deposit(self, deposit_id: int) -> None:
+        self.update("deposits", [("closed", True)], conditions=[("deposit_id", "=", deposit_id)])
+    
     def add_deposit_line(self, deposit_id: int, product_id: int, canceled: bool=False) -> dict[str,Any]: 
         pid = self.write_one(
             "deposit_lines",
