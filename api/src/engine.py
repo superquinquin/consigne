@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 from typing import Any
 
 from src.odoo import OdooConnector
 from src.database import ConsigneDatabase
-from src.ticket import DepositTicket, ConsignePrinter
+from src.ticket import ConsignePrinter
 from src.utils import generate_ean
 
 
@@ -17,6 +19,8 @@ class ConsigneEngine(object):
         self.odoo = odoo
         self.database = database
         self.printer = printer
+
+        self.database.load_metadata(__name__)
 
     def initialize_return(self, receiver_code: int, provider_code: int) -> int:
         """
@@ -98,7 +102,7 @@ class ConsigneEngine(object):
         }
         
     def cancel_deposit_line(self, deposit_id: int,  deposit_line_id: int) -> None:
-        self.database.cancel_deposit_line(deposit_id, deposit_line_id)
+        self.database.cancel_returned_product(deposit_id, deposit_line_id)
 
     def get_deposit_data(self, deposit_id: int) -> dict[str, Any]:
         return self.database.get_deposit_data(deposit_id)
@@ -130,18 +134,18 @@ class ConsigneEngine(object):
         4. return ticket in the printer accepted format
         """
         
-        deposit = self.database.read_one("deposits", conditions=[("deposit_id", "=", deposit_id)])
-        receiver_id = deposit.get("receiver_id")
-        ean = deposit.get("deposit_barcode", None)
-
-        receiver = self.database.read_one("users", fields=["user_code", "user_name"], conditions=[("user_id","=", receiver_id)])
+        deposit = self.database.get_deposit_data(deposit_id)
+        receiver_id = deposit["deposit"]["receiver_id"]
+        ean = deposit["deposit"].get("deposit_barcode", None)
+        
+        receiver = {k:v for k,v in self.database.get_user_from_id(receiver_id).items() if k in ["user_code", "user_name"]}
 
         returns_per_types = self.database.get_returns_per_types(deposit_id)
         total_value = sum([r[2] for r in returns_per_types])
 
         if ean is None:
             ean = generate_ean(total_value)
-            self.database.update("deposits", [("deposit_barcode", ean)], conditions=[("deposit_id", "=", deposit_id)])
+            self.database.update_deposit_barcode(deposit_id, ean)
 
         with self.printer.make_printer_session() as p:
             p.print_ticket(
@@ -160,3 +164,38 @@ class ConsigneEngine(object):
 
     def close_deposit(self, deposit_id: int) -> None:
         self.database.close_deposit(deposit_id)
+
+    def redeem_analyzer(self) -> None:
+        """
+        TODO: analyzer configuration.
+        TODO: define search frequency and span.
+        """
+        before = datetime.now()
+        after = datetime.now().replace(hour=23, minute=59, second=59) - timedelta(days=1)
+
+        with self.odoo.make_session() as session:
+            records = session.get_redeemed_tickets([], before, after)
+            for record in records:
+
+                # GET USER & CREATE REFERENCE IF UNKNOWN
+                partner = record.order_id.partner_id
+                partner_db = self.database.get_user_from_code(partner.barcode_base)
+                if partner_db is None:
+                    partner_payload = session.get_partner_record_from_code(partner.barcode)
+                    partner_db = self.database.add_user(*partner_payload) # use user_id for the redeem record
+
+                user_id = partner_db.get("user_id")
+                pos_id, dt, value, barcode =  session.pos_order_line_to_record(record)
+                # FIND ALL NON REDEEMED DEPOSITS WITH MATCHING RECEIVER__CODE & DEPOSIT_TOTAL_VALUE
+                deposit = self.database.match_redeem_deposits(barcode, user_id, value)
+                if deposit:
+                    # MATCHING
+                    deposit_id = deposit.get("deposit_id")
+                    redeem = self.database.add_redeem(pos_id, datetime.fromisoformat(dt), user_id, value, barcode, False)
+                    redeem_id = redeem.get("redeem_id")
+                    self.database.update_deposit_redeem(deposit_id, redeem_id)
+                else:
+                    # NO MATCH = ANOMALY
+                    self.database.add_redeem(pos_id, datetime.fromisoformat(dt), user_id, value, barcode, True)
+
+

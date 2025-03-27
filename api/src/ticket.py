@@ -136,3 +136,30 @@ class DepositTicket(ABC, ContextDecorator):
         self.text("\n")
         self.qr("https://www.youtube.com/watch?v=dQw4w9WgXcQ", size=10)
         self.cut()
+
+
+@dataclass(frozen=True)
+class RedeemAnaliserSettings:
+    ...
+
+@dataclass(frozen=True)
+class PurchaseBehaviorSettings:
+    ...
+
+class Analyzer(object):
+    redeem_settings: RedeemAnaliserSettings | None
+    behevioral_settings: PurchaseBehaviorSettings | None
+
+    def __init__(self, redeem_settings: RedeemAnaliserSettings, behavioral_settings: PurchaseBehaviorSettings):
+        self.redeem_settings = redeem_settings
+        self.behevioral_settings = behavioral_settings
+
+    @classmethod
+    def from_configs(cls, settings: dict[str, Any]) -> Analyzer:
+        redeem = settings.get("redeem", None)
+        if redeem:
+            redeem = RedeemAnaliserSettings(**redeem)
+        behavior = settings.get("behavior", None)
+        if behavior:
+            behavior = PurchaseBehaviorSettings(**behavior)
+        return cls(redeem, behavior)

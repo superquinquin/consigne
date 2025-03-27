@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS redeem (
     odoo_pos_id INTEGER NOT NULL,
     redeem_datetime DATETIME NOT NULL,
     redeem_user INTEGER NOT NULL REFERENCES users(user_id),
-    redeem_value INTEGER NOT NULL,
+    redeem_value REAL NOT NULL,
     redeem_barcode TEXT NOT NULL,
     anomaly BOOL NOT NULL
 );
