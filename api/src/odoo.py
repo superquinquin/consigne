@@ -163,4 +163,9 @@ class OdooSession(ContextDecorator):
             dist = None
         return dist
 
-    
+    def get_redeemed_tickets(self, barcodes: list[str], before: datetime, after: datetime) -> RecordList:
+        """research specific barcodes in pos.order_lines before and after certain dates. return matched records"""
+        return self.browse("pos.order.line", [("product_id.barcode", "in", barcodes), ("create_date", "<", before), ("create_date", ">=", after)])
+        
+    def pos_order_line_to_record(self, record: Record) -> tuple:
+        return (record.order_id.id, record.create_date, record.price_unit, record.product_id.barcode)
