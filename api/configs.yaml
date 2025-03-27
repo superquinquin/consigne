@@ -7,8 +7,8 @@ app:
       templating_path_to_templates: ./src/templates/
 
   database:
-    path: database.db
-    timeout: 5
+    dialect: sqlite
+    database: database.db
 
   caching: ...
 
