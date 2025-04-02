@@ -64,7 +64,11 @@ class Consigne:
         app.on_response(log_exit, priority=100)
         app.error_handler.add(Exception, error_handler)
 
-        connector = OdooConnector(**odoo)
+        erp = odoo.get("erp", None)
+        if erp is None:
+            raise KeyError("Missing configuration for odoo erp.")
+
+        connector = OdooConnector(**erp)
         consigne_database = ConsigneDatabase(**database)
         consigne_printer = ConsignePrinter.from_configs(**printer)
         engine = ConsigneEngine(connector, consigne_database, consigne_printer)

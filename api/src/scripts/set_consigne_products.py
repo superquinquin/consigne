@@ -240,8 +240,8 @@ class Builder(object):
     def run(self):
         parent_cat, product_cat, return_cat = self.odoo.create_consigne_cat()
         
-        # self.set_returns(return_cat.id)
-        # self.set_products(product_cat.id)
+        self.set_returns(return_cat.id)
+        self.set_products(product_cat.id)
         self.set_returnables()
         
     def set_products(self, categ_id: int) -> None:
