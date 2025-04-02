@@ -51,6 +51,15 @@ CREATE TABLE IF NOT EXISTS redeem (
     anomaly BOOL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS consigne (
+    consigne_id INTEGER PRIMARY KEY,
+    consigne_pattern TEXT,
+    consigne_name TEXT,
+    consigne_barcode TEXT UNIQUE,
+    consigne_barcode_base INTEGER
+);
+
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_partner_id ON users(user_partner_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_codes ON users(user_code);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_opid ON products(odoo_product_id);

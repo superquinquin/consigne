@@ -30,11 +30,42 @@ app:
 
 
   odoo:
-    login: ${ERP_USERNAME}
-    password: ${ERP_PASSWORD}
-    database: ${ERP_DB}
-    host: ${ERP_URL}
-    verbose: False
+    taxonomy:
+      products:
+        in_place: True # variation number = variation + in place variations
+        variation_number: 10 # aim to have 10 consigne product records == 10 differents usable barcodes 
+        template:
+          name: Consigne
+          rule: 999....{NNNDD}
+          
+      returns:
+        - name: Pajot
+          value: 0.25
+        - name: Celtic
+          value: 0.20
+        - name: Club Maté
+          value: 0.20
+        - name: Bière 25/33cl
+          value: 0.10
+        - name: Bière 75cl
+          value: 0.20
+        - name: Lait
+          value: 0.50
+        - name: Gaz
+          value: 10.0
+
+      returnables:
+        - barcode: 5411087001029 # barcode of the returnable product 
+          returnable: True
+          returned: Pajot # name of the returns product possibly from returns
+
+
+    erp:
+      login: ${ERP_USERNAME}
+      password: ${ERP_PASSWORD}
+      database: ${ERP_DB}
+      host: ${ERP_URL}
+      verbose: False
 
   logging:
     version: 1
