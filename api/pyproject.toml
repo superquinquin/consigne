@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "attrs>=25.1.0",
+    "click>=8.1.8",
     "erppeek>=1.7.1",
     "pillow==9.5.0",
     "python-barcode>=0.15.1",
@@ -30,3 +31,15 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 omit = ["tests/*"]
+
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src", "src.*"]
+exclude = ["tests.*"]
+
+[project.scripts]
+consigne = "src.scripts:cli"
