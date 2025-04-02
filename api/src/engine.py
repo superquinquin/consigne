@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 
 from typing import Any
@@ -164,6 +165,14 @@ class ConsigneEngine(object):
 
     def close_deposit(self, deposit_id: int) -> None:
         self.database.close_deposit(deposit_id)
+
+
+    async def ticket_emissions_analyze(self) -> None:
+        while True:
+            await asyncio.sleep(0)
+            self.redeem_analyzer()
+
+            
 
     def redeem_analyzer(self) -> None:
         """
