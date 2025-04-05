@@ -3,15 +3,15 @@ CREATE TABLE IF NOT EXISTS users (
     user_partner_id INTEGER UNIQUE NOT NULL,
     user_code INTEGER UNIQUE NOT NULL,
     user_name TEXT NOT NULL,
-    last_provider_activity DATETIME,
-    last_receiver_activity DATETIME
+    last_provider_activity TEXT,
+    last_receiver_activity TEXT
 );
 
 CREATE TABLE IF NOT EXISTS  deposits(
     deposit_id INTEGER PRIMARY KEY,
     receiver_id INTEGER NOT NULL REFERENCES users(user_id),
     provider_id INTEGER NOT NULL REFERENCES users(user_id),
-    deposit_datetime DATETIME NOT NULL,
+    deposit_datetime TEXT NOT NULL,
     closed BOOL NOT NULL,
     deposit_barcode TEXT,
     redeemed INTEGER REFERENCES redeem(redeem_id)
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS deposit_lines (
     deposit_line_id INTEGER PRIMARY KEY,
     deposit_id INTEGER NOT NULL REFERENCES deposits(deposit_id),
     product_id INTEGER NOT NULL REFERENCES products(product_id),
-    deposit_line_datetime DATETIME NOT NULL,
+    deposit_line_datetime TEXT NOT NULL,
     canceled BOOL NOT NULL
 );
 
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS product_returns (
 CREATE TABLE IF NOT EXISTS redeem (
     redeem_id INTEGER PRIMARY KEY,
     odoo_pos_id INTEGER NOT NULL,
-    redeem_datetime DATETIME NOT NULL,
+    redeem_datetime TEXT NOT NULL,
     redeem_user INTEGER NOT NULL REFERENCES users(user_id),
     redeem_value REAL NOT NULL,
     redeem_barcode TEXT NOT NULL,

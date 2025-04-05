@@ -109,7 +109,7 @@ class ConsigneDatabase:
             stmt = (
                 update(Users)
                 .where(Users.user_id == user_id)
-                .values({field:datetime.now()})
+                .values({field:datetime.now().isoformat("-")})
             )
             session.execute(stmt)
             session.commit()
@@ -212,7 +212,7 @@ class ConsigneDatabase:
                 .values(
                     receiver_id=receiver_id,
                     provider_id=provider_id,
-                    deposit_datetime=datetime.now(),
+                    deposit_datetime=datetime.now().isoformat("-"),
                     closed=False,
                     deposit_barcode=None,
                     redeemed=None
@@ -241,7 +241,7 @@ class ConsigneDatabase:
                 .values(
                     deposit_id=deposit_id,
                     product_id=product_id,
-                    deposit_line_datetime=datetime.now(),
+                    deposit_line_datetime=datetime.now().isoformat("-"),
                     canceled=canceled,
                 )
                 .returning(Deposit_lines.deposit_line_id)
@@ -361,7 +361,7 @@ class ConsigneDatabase:
             res = session.execute(text(POS_REDEEM_MATCHING), {'pid':partner_id, "barcode": barcode, "value": value}).fetchall()
         return res
 
-    def add_redeem(self, order_id: int, dt: datetime, user_id: int, value: float, barcode: str, anomaly: bool) -> dict[str, Any]:
+    def add_redeem(self, order_id: int, dt: str, user_id: int, value: float, barcode: str, anomaly: bool) -> dict[str, Any]:
         with self.session_maker() as session:
             stmt = (
                 insert(Redeem)
