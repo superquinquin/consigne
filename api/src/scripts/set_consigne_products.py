@@ -69,7 +69,8 @@ class BuildingDatabase(ConsigneDatabase):
                     consigne_pattern=product.barcode_pattern,
                     consigne_name=product.name,
                     consigne_barcode=product.barcode,
-                    consigne_barcode_base=product.barcode_base
+                    consigne_barcode_base=product.barcode_base,
+                    consigne_active=True
                 )
             )
             session.execute(stmt)
@@ -149,6 +150,7 @@ class BarcodeGenerator(object):
     def __init__(self, rule: str, avoid: list[tuple], number: int=1, in_place: bool = True):
         self.rule = rule
         self.avoid = avoid
+        self.variation_number = number
         if in_place:
             self.variation_number =  number - len(avoid)
             if self.variation_number <= 0:
@@ -159,10 +161,15 @@ class BarcodeGenerator(object):
             uniq = False
             while uniq is False:
                 base_values = [str(random.randrange(10)) for _ in re.findall(r"\.", self.rule)]
-                uniq = not any(self.avoid) or any(["".join(base_values) == str(base) for base, _ in self.avoid])
+                if len(self.avoid) == 0:
+                    uniq = True
+                elif not any(["".join(base_values) == str(base) for base, _ in self.avoid]):
+                    uniq = True
+            barcode_base = "".join(base_values)
+            self.avoid.append((barcode_base, ""))
+
             filler_values = [str(random.randrange(10)) for _ in re.findall(r"N|D", self.rule)]
 
-            barcode_base = "".join(base_values)
             barcode = self._barcode(deque(base_values), deque(filler_values))
             yield (barcode_base, barcode + str(self._checksum(barcode)))
 
@@ -258,7 +265,6 @@ class Builder(object):
             raise KeyError("You must define a consigne product barcode rule")
     
         generator = BarcodeGenerator(rule, current_barcodes, variation, in_place)
-
         for base, barcode in generator.generate_barcode():
             product = Product(name, categ_id, barcode, base, rule)
             self.odoo.create_consigne_product(product)  

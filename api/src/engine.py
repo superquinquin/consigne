@@ -1,26 +1,48 @@
 from __future__ import annotations
 
+import logging
 import asyncio
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from typing import Any
+
+from src.exceptions import SameUserError
 
 from src.odoo import OdooConnector
 from src.database import ConsigneDatabase
 from src.ticket import ConsignePrinter
 from src.utils import generate_ean
 
+tasks_logger = logging.getLogger("tasks")
+
+@dataclass(frozen=True)
+class TaskConfigs:
+    pooling: bool = field(default=False)
+    frequency: int =  field(default=600)
+
+
 
 class ConsigneEngine(object):
     odoo: OdooConnector
     database: ConsigneDatabase
     printer: ConsignePrinter
+    tasks: dict[str,TaskConfigs]
 
-    def __init__(self, odoo: OdooConnector, database: ConsigneDatabase, printer: ConsignePrinter):
+    def __init__(
+        self, 
+        odoo: OdooConnector, 
+        database: ConsigneDatabase, 
+        printer: ConsignePrinter, 
+        tasks: dict[str, TaskConfigs]=None
+    ) -> None:
         self.odoo = odoo
         self.database = database
         self.printer = printer
 
+        if tasks is None:
+            tasks = {}
+        self.tasks = tasks
         self.database.load_metadata(__name__)
 
     def initialize_return(self, receiver_code: int, provider_code: int) -> int:
@@ -32,6 +54,10 @@ class ConsigneEngine(object):
         4. build db reference for the deposit
         Return deposit_id that is need by the front to further operate.
         """
+        if receiver_code == provider_code:
+            # FORBID OWN RETURNS
+            raise SameUserError()
+
         user = self.database.get_user_from_code(receiver_code)
         if user is None:
             with self.odoo.make_session() as session:
@@ -145,8 +171,9 @@ class ConsigneEngine(object):
         total_value = sum([r[2] for r in returns_per_types])
 
         if ean is None:
-            ean = generate_ean(total_value)
-            self.database.update_deposit_barcode(deposit_id, ean)
+            base_id, base = self.database.next_barcode_base()
+            ean = generate_ean(total_value, base)
+            self.database.update_deposit_barcode(deposit_id, ean, base_id)
 
         with self.printer.make_printer_session() as p:
             p.print_ticket(
@@ -157,6 +184,12 @@ class ConsigneEngine(object):
                 ean=ean
             )
 
+    def get_shifts_users(self) -> list[tuple[int, str]]:
+        """get current shift users. return list of barcodebase, display_name"""
+        with self.odoo.make_session() as session:
+            res = session.get_current_shifts_members()
+        return res
+
     def search_user(self, value: str) -> list[tuple[int, str]]:
         """fuzzy search for the user."""
         with self.odoo.make_session() as session:
@@ -166,24 +199,20 @@ class ConsigneEngine(object):
     def close_deposit(self, deposit_id: int) -> None:
         self.database.close_deposit(deposit_id)
 
-
-    async def ticket_emissions_analyze(self) -> None:
-        while True:
-            await asyncio.sleep(0)
-            self.redeem_analyzer()
-
-            
-
     def redeem_analyzer(self) -> None:
         """
         TODO: analyzer configuration.
         TODO: define search frequency and span.
         """
         before = datetime.now()
-        after = datetime.now().replace(hour=23, minute=59, second=59) - timedelta(days=1)
+        after = self.database.get_last_redeem_datetime() or self.database.get_first_deposit_datetime()
 
+        if after is None:
+            return
+
+        bases = self.database.get_tracked_consigne_barcodes_bases()
         with self.odoo.make_session() as session:
-            records = session.get_redeemed_tickets([], before, after)
+            records = session.get_redeemed_tickets(bases, before, datetime.fromisoformat(after))
             for record in records:
 
                 # GET USER & CREATE REFERENCE IF UNKNOWN
@@ -207,4 +236,29 @@ class ConsigneEngine(object):
                     # NO MATCH = ANOMALY
                     self.database.add_redeem(pos_id, datetime.fromisoformat(dt), user_id, value, barcode, True)
 
+    async def ticket_emissions_analyze(self) -> None:
+        settings = self.tasks.get("analyzer", None)
+        if settings is None:
+            raise ValueError("Analyzer settings must be set to run the ticket emissions analysis")
 
+        tasks_logger.info("ANALYZER | Thread starting...")
+        while True:
+            tasks_logger.info(f"ANALYZER | Next process in {settings.frequency} secs")
+            await asyncio.sleep(settings.frequency)
+            self.redeem_analyzer()
+
+    async def bases_tracker_runner(self) -> None:
+        settings = self.tasks.get("tracking", None)
+        if settings is None:
+            raise ValueError("trackinh settings must be set to run the consigne barcode tracking")
+        
+        tasks_logger.info("TRACKING | Thread starting...")
+        while True:
+            tasks_logger.info(f"TRACKING | Next process in {settings.frequency} secs")
+            await asyncio.sleep(settings.frequency)
+            await self.track_bases()
+
+    async def bases_tracker(self) -> None:
+        with self.odoo.make_session() as session:
+            existing = session.get_existing_consigne_barcodes()
+        self.database._update_consigne_barcodes(existing)

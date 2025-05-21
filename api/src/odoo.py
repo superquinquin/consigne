@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import time
 from contextlib import ContextDecorator
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps, lru_cache
 from http.client import CannotSendRequest
 from erppeek import Client, Record, RecordList
@@ -14,6 +14,7 @@ Conditions = list[tuple[str, str, Any]]
 
 FZ_LIMIT = 5
 SHIFT_DT_TOLERANCE = 5
+SHIFT_LEN = timedelta(hours=2, minutes=45)
 
 def resilient(degree: int = 3):
     def decorator(f: Callable):
@@ -163,9 +164,39 @@ class OdooSession(ContextDecorator):
             dist = None
         return dist
 
-    def get_redeemed_tickets(self, barcodes: list[str], before: datetime, after: datetime) -> RecordList:
+    def get_redeemed_tickets(self, bases: list[str], before: datetime, after: datetime) -> RecordList:
         """research specific barcodes in pos.order_lines before and after certain dates. return matched records"""
-        return self.browse("pos.order.line", [("product_id.barcode", "in", barcodes), ("create_date", "<", before), ("create_date", ">=", after)])
+        return self.browse("pos.order.line", [("product_id.barcode_base", "in", bases), ("create_date", "<", before), ("create_date", ">=", after)])
         
     def pos_order_line_to_record(self, record: Record) -> tuple:
         return (record.order_id.id, record.create_date, record.price_unit, record.product_id.barcode)
+    
+    def get_existing_consigne_barcodes(self) -> list[tuple]:
+        product_cat = self.get("product.category", [("name", "=", "Consigne_product")])
+        if product_cat is None:
+            raise ValueError("Setup Odoo consigne taxonomies first.")
+        product_cat_id = product_cat.id
+        return [(str(r.barcode_base), r.barcode, r.name, r.sale_ok) for r in self.browse("product.product", [("product_tmpl_id.categ_id.id", "=", product_cat_id)])]
+
+    def get_current_shifts(self) -> RecordList:
+        SHIFT_WINDOW_FLOOR = os.environ.get("SHIFT_WINDOW_FLOOR", 15)
+        SHIFT_WINDOW_CEILING = os.environ.get("SHIFT_WINDOW_CEILING", 15) 
+
+        begin = (datetime.now() - SHIFT_LEN - timedelta(minutes=SHIFT_WINDOW_FLOOR)).isoformat()
+        end = (datetime.now() + timedelta(minutes=SHIFT_WINDOW_CEILING)).isoformat()
+        shifts = self.browse("shift.shift", [("date_begin_tz", ">=", begin), ("date_begin_tz", "<=", end), ("shift_type_id.id", "=", 1)])
+        return shifts
+
+    def get_shifts_members(self, shifts: RecordList) -> list[tuple[int, str]]:
+        current_members = []
+        for shift in shifts:
+            members = self.browse("shift.registration", [("shift_id", "=", shift.id)])
+            current_members.extend([(r.partner_id.barcode_base, r.partner_id.display_name) for r in members])
+
+        current_members = sorted(current_members, key= lambda x: x[0])
+        return current_members
+    
+    def get_current_shifts_members(self) -> list[tuple[int, str]]:
+        shifts = self.get_current_shifts()
+        members = self.get_shifts_members(shifts)
+        return members

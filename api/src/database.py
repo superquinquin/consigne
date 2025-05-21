@@ -166,11 +166,13 @@ class ConsigneDatabase:
             session.commit()
         return res
 
-    def update_deposit_barcode(self, deposit_id: int, ean: str) -> None:
+    def update_deposit_barcode(self, deposit_id: int, ean: str, barcode_base_id: int) -> None:
         with self.session_maker() as session:
             stmt = (
                 update(Deposits)
-                .values(deposit_barcode=ean)
+                .values(deposit_barcode=ean, 
+                        deposit_barcode_base_id=barcode_base_id
+                )
                 .where(Deposits.deposit_id == deposit_id)
             )
             session.execute(stmt)
@@ -263,8 +265,40 @@ class ConsigneDatabase:
 
 
     # GLOBAL
+    def get_first_deposit_datetime(self) -> str|None:
+        with self.session_maker() as session:
+            stmt = (
+                select(Deposits)
+                .where(Deposits.deposit_id == 1)
+            )
+            deposit = self._collect(session.execute(stmt), "one")
+            if deposit is None:
+                return
+            return deposit.get("deposit_datetime")
 
-    def get_deposit_data(self, deposit_id: int) -> dict[str,Any]:
+    def get_last_redeem_datetime(self) -> str|None:
+        with self.session_maker() as session:
+            stmt = (
+                select(Redeem)
+                .order_by(Redeem.redeem_id.desc())
+                .limit(1)
+            )
+            redeem = self._collect(session.execute(stmt), "one")
+            if redeem is None:
+                return
+            return redeem.get("redeem_datetime")
+
+    def get_tracked_consigne_barcodes_bases(self) -> list[str]:
+        with self.session_maker() as session:
+            stmt = (
+                select(Consigne.consigne_barcode_base)
+                .select_from(Consigne)
+            )
+            redeem = self._collect(session.execute(stmt), "all")
+        return [r.get("consigne_barcode_base") for r in redeem]
+
+
+    def get_deposit_data(self, deposit_id: int) -> dict[str,Any]|None:
         with self.session_maker() as session:
             stmt = (
                 select(Deposits)
@@ -377,4 +411,69 @@ class ConsigneDatabase:
             )
             res = session.execute(stmt).fetchone()._asdict()
             session.commit()
+        return res
+    
+    def _update_consigne_barcodes(self, records: tuple) -> None:
+        with self.session_maker() as session:
+            stmt = (
+                select(Consigne.consigne_barcode_base)
+                .select_from(Consigne)
+            )
+            bases = [r[0] for r in session.execute(stmt).fetchall()]
+            for base, barcode, name, sale_ok in records:
+                if base not in bases and sale_ok:
+                    stmt = (
+                        insert(Consigne)
+                        .values(
+                            consigne_name=name,
+                            consigne_barcode=barcode,
+                            consigne_barcode_base=base,
+                            consigne_active=True
+                        )
+                    )
+                    session.execute(stmt)
+                
+                elif base in bases and sale_ok is False:
+                    stmt = (
+                        update(Consigne)
+                        .values(consigne_active=False)
+                        .where(Consigne.consigne_barcode_base == base)
+                    )
+                    session.execute(stmt)
+            session.commit()
+
+
+    def next_barcode_base(self) -> tuple[int, str]:
+        with self.session_maker() as session:
+            stmt = (
+                select(Deposits.deposit_barcode_base_id)
+                .where(Deposits.deposit_barcode_base_id != None)
+                .order_by(Deposits.deposit_id.desc())
+                .limit(1)
+                
+            )
+            res = session.execute(stmt).fetchone() or (0,)
+            consigne_id = res[0]
+
+            base = None
+            base_id = consigne_id + 1
+            while base is None:
+                base = self._get_base(base_id)
+                if base is None and base_id == 1:
+                    raise ValueError("No consigne barcode found")
+                elif base is None:
+                    base_id = 1
+        return (base_id, base)
+        
+
+    def _get_base(self, consigne_id: int) -> int|None:
+        with self.session_maker() as session:
+            stmt = (
+                select(Consigne.consigne_barcode_base)
+                .select_from(Consigne)
+                .where(Consigne.consigne_id == consigne_id)
+            )
+            res = session.execute(stmt).fetchone()
+        if res:
+            return res[0]
         return res
