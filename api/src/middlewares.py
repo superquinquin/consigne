@@ -20,7 +20,7 @@ async def error_handler(request: Request, exception: Exception):
     if not isinstance(exception.__class__.__base__, Exception):
         # log traceback of non handled errors
         logger.error(traceback.format_exc())
-    return json({"status": status, "reasons": str(exception)})
+    return json({"status": status, "reasons": str(exception)}, status=status)
 
 async def go_fast(request: Request) -> None:
     request.ctx.t = perf_counter()
