@@ -12,6 +12,14 @@ app:
 
   caching: ...
 
+  tasks:
+    analyzer:
+      pooling: True
+      frequency: 600 # in seconds
+    tracking:
+      pooling: True
+      frequency: 600 # in seconds
+
   printer:
     ## NETWORK ADAPTER CONFIGURATION EXAMPLE
     adapter: Network
@@ -32,10 +40,10 @@ app:
   odoo:
     taxonomy:
       products:
-        in_place: True # variation number = variation + in place variations
-        variation_number: 10 # aim to have 10 consigne product records == 10 differents usable barcodes 
+        in_place: False # variation number = variation + in place variations
+        variation_number: 2 # aim to have 10 consigne product records == 10 differents usable barcodes 
         template:
-          name: Consigne
+          name: Consigne 2
           rule: 999....{NNNDD}
           
       returns:
@@ -51,8 +59,8 @@ app:
           value: 0.20
         - name: Lait
           value: 0.50
-        - name: Gaz
-          value: 10.0
+        # - name: Gaz
+        #   value: 10.0
 
       returnables:
         - barcode: 5411087001029 # barcode of the returnable product 
@@ -107,4 +115,7 @@ app:
         level: INFO
         handlers: [stream, error_file, access_file]
         propagate: True
-
+      tasks:
+        level: INFO
+        handlers: [stream, error_file, access_file]
+        propagate: True

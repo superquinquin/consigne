@@ -1,3 +1,4 @@
+import asyncio
 from src.main import Consigne
 
-app = Consigne.create_app("configs.yaml")
+app = asyncio.run(Consigne.create_app("configs.yaml"))

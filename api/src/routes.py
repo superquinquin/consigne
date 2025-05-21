@@ -140,3 +140,9 @@ async def search_user(request: Request) -> HTTPResponse:
     engine: ConsigneEngine = request.app.ctx.engine
     res = engine.search_user(inp)
     return json({"status": 200, "reasons": "OK", "data": {"matches": res}})
+
+@consigneBp.route("/get-shifts-users", methods=["GET"])
+async def get_shifts_users(self, request: Request) -> HTTPResponse:
+    engine: ConsigneEngine = request.app.ctx.engine
+    users = engine.get_shifts_users()
+    return json({"status": 200, "reasons": "OK", "data": {"users": users}})

@@ -3,19 +3,18 @@ import random
 from functools import reduce
 from collections import deque
 
-def generate_ean(total_value: float) -> str:
+
+def generate_ean(total_value: float, base: str, rule:str = "999....NNNDD") -> str:
     def checksum(ean: str) -> int:
         sum = lambda x, y: int(x) + int(y)
         evensum = reduce(sum, ean[::2])
         oddsum = reduce(sum, ean[1::2])
         return (10 - ((evensum + oddsum * 3) % 10)) % 10
     
-    BARCODE_RULE: str = "999....NNNDD"
-    INT_SIZE = len(re.findall(r"N", BARCODE_RULE))
-    FLT_SIZE = len(re.findall(r"D", BARCODE_RULE))
-    rule = BARCODE_RULE
+    INT_SIZE = len(re.findall(r"N", rule))
+    FLT_SIZE = len(re.findall(r"D", rule))
 
-    values = deque([random.randrange(10) for _ in re.findall(r"\.", rule)])
+    values = deque(list(base))
     while len(values) > 0:
         index = rule.index(".")
         value = values.popleft()

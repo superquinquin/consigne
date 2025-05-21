@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS  deposits(
     deposit_datetime TEXT NOT NULL,
     closed BOOL NOT NULL,
     deposit_barcode TEXT,
+    deposit_barcode_base_id INTEGER REFERENCES consigne(consigne_id),
     redeemed INTEGER REFERENCES redeem(redeem_id)
 );
 
@@ -56,7 +57,8 @@ CREATE TABLE IF NOT EXISTS consigne (
     consigne_pattern TEXT,
     consigne_name TEXT,
     consigne_barcode TEXT UNIQUE,
-    consigne_barcode_base INTEGER
+    consigne_barcode_base TEXT,
+    consigne_active BOOL
 );
 
 

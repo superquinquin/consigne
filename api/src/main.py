@@ -14,11 +14,12 @@ from typing import Any, Literal
 from src.parsers import get_config
 from src.routes import consigneBp
 from src.middlewares import error_handler, go_fast, log_exit
+from src.listeners import start_redeem_analizer, start_barcode_tracking, initialize_barcode_bases
 
 from src.odoo import OdooConnector
 from src.database import ConsigneDatabase
 from src.ticket import ConsignePrinter, UsbSettings, NetworkSettings
-from src.engine import ConsigneEngine
+from src.engine import ConsigneEngine, TaskConfigs
 
 
 
@@ -37,12 +38,13 @@ class Consigne:
         self.print_banner()
 
     @classmethod
-    def initialize_from_configs(
+    async def initialize_from_configs(
         cls,
         sanic: dict[str, Any],
         odoo: dict[str, Any],
         database: dict[str, Any],
         printer: dict[str, Any],
+        tasks: dict[str, Any] | None = None, 
         caching: dict[str, Any] | None = None,
         logging: dict[str, Any] | None = None,
         options: dict[str, Any] | None = None,
@@ -68,23 +70,30 @@ class Consigne:
         if erp is None:
             raise KeyError("Missing configuration for odoo erp.")
 
+        tasks_settings = cls.parse_tasks_settings(tasks)
+
         connector = OdooConnector(**erp)
         consigne_database = ConsigneDatabase(**database)
         consigne_printer = ConsignePrinter.from_configs(**printer)
-        engine = ConsigneEngine(connector, consigne_database, consigne_printer)
+        engine = ConsigneEngine(connector, consigne_database, consigne_printer, tasks_settings)
+        
         app.ctx.engine = engine
         consigne = cls(app, engine, env)
+
+        await initialize_barcode_bases(app)
+        await start_redeem_analizer(app)
+        await start_barcode_tracking(app)
         return consigne.app
 
     @classmethod
-    def create_app(cls, path: StrOrPath|None=None) -> Sanic:
+    async def create_app(cls, path: StrOrPath|None=None) -> Sanic:
         """config path either defined as env var or as argument"""
         env_path = os.environ.get("CONFIG_FILEPATH", None)
         if not any([path, env_path]):
             raise ValueError("You must pass your configuration file path as an argument or as Environment Variable: `CONFIG_FILEPATH`.")
         if path is None:
             path = env_path
-        return cls.initialize_from_configs(**get_config(path))
+        return await cls.initialize_from_configs(**get_config(path))
 
     def print_banner(self) -> None:
         version = Path("./src/VERSION").read_text()
@@ -101,6 +110,12 @@ class Consigne:
         logging["handlers"].update(LOGGING_CONFIG_DEFAULTS["handlers"])
         logging["formatters"].update(LOGGING_CONFIG_DEFAULTS["formatters"])
         return logging
+
+    @staticmethod
+    def parse_tasks_settings(tasks: dict[str, Any]|None=None) -> dict[str, TaskConfigs]:
+        if tasks is None:
+            return {}
+        return {k:TaskConfigs(**v) for k,v in tasks.items()}
 
 if __name__ == "__main__":
     Consigne.create_app("configs.yaml")
