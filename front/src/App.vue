@@ -1,17 +1,21 @@
-<script setup lang="ts">
-
-</script>
+<script setup lang="ts"></script>
 
 <template>
-  <header class="flex flex-col items-center justify-between">
+  <header class="flex flex-row justify-between items-center">
     <h1 class="text-black text-4xl">Retournez vos bouteilles ! 🔄</h1>
-    <img alt="Vue logo" class="logo" src="./assets/bouteille%20de%20biere.webp" width="500" height="500" />
+    <img
+      alt="Vue logo"
+      class="logo"
+      src="./assets/bouteille%20de%20biere.webp"
+      width="300"
+      height="300"
+    />
   </header>
-  <RouterView/>
+  <RouterView />
 </template>
 
 <style>
-@import "tailwindcss";
+@import 'tailwindcss';
 
 body {
   background: #f1f2e9;
