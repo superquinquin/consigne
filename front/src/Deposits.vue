@@ -109,7 +109,8 @@ const createDeposit = async () => {
   <div class="hidden py-4 text-black">Deposit state : {{ JSON.stringify(depositState) }}</div>
   <main class="w-full h-full">
     <div class="text-black">
-      Afin de tester, essayez les codes barres suivant : 3770000661170, 5411087001562
+      Afin de tester, essayez les codes barres suivant : 3770000661170, 5411087001562,
+      3361730666667, 3770000661071
     </div>
     <br />
     <template v-if="!globalState.depositId">
