@@ -32,25 +32,23 @@ state.loading = false
 </script>
 
 <template v-if="state.shiftUsers.length > 0">
-  <h2 class="text-2xl text-black font-bold">Coopérateur du créneau</h2>
-  <div class="flex w-full flex-wrap">
-    <div
-      class="p-2"
-      v-for="item in state.shiftUsers"
-      :key="item.coopNumber"
-      @click="
-        () => {
-          $emit('select-user', item.coopNumber)
-        }
-      "
-    >
-      <UserCard
-        :profile-picture-url="item.profilePictureUrl"
-        :first-name="item.firstName"
-        :last-name="item.lastName"
-        :coop-number="item.coopNumber"
-        :is-selected="selectedUserId === item.coopNumber.toString()"
-      />
+  <div>
+    <h2 class="text-2xl text-black font-bold">Coopérateur du créneau</h2>
+    <div class="flex w-full flex-wrap">
+      <div
+        class="p-2"
+        v-for="item in state.shiftUsers"
+        :key="item.coopNumber"
+        @click="$emit('select-user', item.coopNumber)"
+      >
+        <UserCard
+          :profile-picture-url="item.profilePictureUrl"
+          :first-name="item.firstName"
+          :last-name="item.lastName"
+          :coop-number="item.coopNumber"
+          :is-selected="selectedUserId === item.coopNumber.toString()"
+        />
+      </div>
     </div>
   </div>
 </template>

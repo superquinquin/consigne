@@ -102,11 +102,7 @@ const onSubmit = async () => {
         class="p-2"
         v-for="item in state.searchResult"
         :key="item.coopNumber"
-        @click="
-          () => {
-            $emit('select-user', item.coopNumber)
-          }
-        "
+        @click="$emit('select-user', item.coopNumber)"
       >
         <UserCard
           :profile-picture-url="item.profilePictureUrl"
