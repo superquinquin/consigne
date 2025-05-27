@@ -4,10 +4,14 @@ import UsersProvider, { type GetShiftsUsersResponse } from '@/services/users.ts'
 import UserCard from '@/components/UserCard.vue'
 
 const usersProvider: typeof UsersProvider | undefined = inject('UsersProvider')
+
+defineProps<{
+  selectedUserId?: string
+}>()
+
 const state = reactive({
   loading: false,
   shiftUsers: [] as GetShiftsUsersResponse['users'],
-  selectUserId: undefined,
 })
 
 state.loading = true
@@ -27,8 +31,8 @@ if (result) {
 state.loading = false
 </script>
 
-<template>
-  <h2 class="text-2xl text-black font-bold">Shift Users</h2>
+<template v-if="state.shiftUsers.length > 0">
+  <h2 class="text-2xl text-black font-bold">Coopérateur du créneau</h2>
   <div class="flex w-full flex-wrap">
     <div
       class="p-2"
@@ -36,7 +40,6 @@ state.loading = false
       :key="item.coopNumber"
       @click="
         () => {
-          state.selectUserId = item.coopNumber
           $emit('select-user', item.coopNumber)
         }
       "
@@ -46,7 +49,7 @@ state.loading = false
         :first-name="item.firstName"
         :last-name="item.lastName"
         :coop-number="item.coopNumber"
-        :is-selected="state.selectUserId === item.coopNumber"
+        :is-selected="selectedUserId === item.coopNumber.toString()"
       />
     </div>
   </div>

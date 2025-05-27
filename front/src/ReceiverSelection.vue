@@ -29,8 +29,16 @@ const onSubmit = async () => {
     <main>
       <div>
         <div class="flex flex-col gap-8">
-          <SearchUser @select-user="selectUser" />
-          <ShiftUsers class="w-full" @select-user="selectUser" />
+          <SearchUser
+            @select-user="selectUser"
+            search-label="Sélectionner le coopérateur recevant les consignes"
+            :selected-user-id="globalState.receiverCode"
+          />
+          <ShiftUsers
+            class="w-full"
+            @select-user="selectUser"
+            :selected-user-id="globalState.receiverCode"
+          />
 
           <button
             @click="onSubmit"
