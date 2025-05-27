@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import type Deposit from '@/services/deposit.ts'
 import SearchUser from '@/components/SearchUser.vue'
 import { globalState } from '@/services/state.ts'
+import deposit from '@/services/deposit.ts'
 
 const router = useRouter()
 const depositProvider: typeof Deposit = inject('DepositProvider')
@@ -90,9 +91,11 @@ const onPrint = async () => {
 }
 
 const onEnd = async () => {
-  globalState.depositId = undefined
-  globalState.providerCode = ''
-  depositState.returnGoods = []
+  await depositProvider.close(globalState.depositId).finally(() => {
+    globalState.depositId = undefined
+    globalState.providerCode = ''
+    depositState.returnGoods = []
+  })
 }
 
 const createDeposit = async () => {
