@@ -32,7 +32,15 @@ const depositState = reactive<{
   printTicketLoading: false,
 })
 
-const errorState = reactive<{ productName?: string }>({ productName: undefined })
+const errorState = reactive<{ productName?: string; reasons?: string }>({
+  productName: undefined,
+  reasons: undefined,
+})
+
+const resetError = () => {
+  errorState.productName = undefined
+  errorState.reasons = undefined
+}
 
 const currentTotalValue = () =>
   depositState.returnGoods.reduce((acc, current) => acc + current.value, 0)
@@ -40,11 +48,19 @@ const currentTotalValue = () =>
 const queryForReturnable = async (barCode: string): Promise<Returnable | null> => {
   const result = await depositProvider.addProduct(globalState.depositId, barCode)
 
-  return {
-    name: result.name,
-    isReturnable: result.returnable,
-    value: result.return_value || 0,
+  if (result.__typename === 'AddProductResponse') {
+    resetError()
+
+    return {
+      name: result.name,
+      isReturnable: result.returnable,
+      value: result.return_value || 0,
+    }
   }
+
+  errorState.reasons = result.reasons
+
+  return null
 }
 
 const groupByBarcode = () =>
@@ -66,7 +82,6 @@ const onSubmit = async (event?: KeyboardEvent) => {
     console.log(returnable)
 
     if (returnable?.isReturnable) {
-      errorState.productName = undefined
       depositState.returnGoods = [...depositState.returnGoods, returnable]
     } else {
       errorState.productName = returnable?.name
@@ -186,18 +201,23 @@ const createDeposit = async () => {
           </div>
         </div>
 
-        <div class="text-black">
-          <ul>
-            <li v-for="value in groupByBarcode()" :key="value.id">
-              {{ value.name }} - x{{ value.quantity }} {{ value.value.toFixed(2) }} euros
-            </li>
-          </ul>
-          Total : {{ currentTotalValue().toFixed(2) }} euros
-        </div>
-
         <div v-if="errorState.productName" class="text-red-500">
           {{ errorState.productName }} n'est pas consigné !
         </div>
+
+        <div v-if="errorState.reasons" class="text-red-500">
+          Une erreur semble avoir apparut :
+          {{ errorState.reasons }}
+        </div>
+
+        <div
+          class="text-black text-xl border-1 border-gray-300 rounded bg-white p-2 flex flex-col gap-2"
+        >
+          <div v-for="value in groupByBarcode()" :key="value.id">
+            ⋅ {{ value.quantity }} x {{ value.name }} - {{ value.value.toFixed(2) }} €
+          </div>
+        </div>
+        <div class="text-black text-2xl">Total : {{ currentTotalValue().toFixed(2) }} €</div>
 
         <div class="flex flex-row gap-8">
           <button @click="onPrint" type="button">

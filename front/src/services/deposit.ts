@@ -1,4 +1,4 @@
-import type { ApiResponse } from '@/services/api.utils.ts'
+import type { ApiError, ApiResponse } from '@/services/api.utils.ts'
 
 export type CreateResponse = {
   deposit_id: number
@@ -57,7 +57,10 @@ export default {
     return response.json().then(({ data }: ApiResponse<GetByIdAndLineIdResponse>) => data)
   },
 
-  addProduct: async function (depositId: string, productCode: string): Promise<AddProductResponse> {
+  addProduct: async function (
+    depositId: string,
+    productCode: string,
+  ): Promise<AddProductResponse | ApiError> {
     const response = await fetch(
       `http://localhost:8000/deposit/${depositId}/return/${productCode}`,
       {
@@ -66,7 +69,14 @@ export default {
       },
     )
 
-    return response.json().then(({ data }: ApiResponse<AddProductResponse>) => data)
+    if (response?.ok) {
+      return response.json().then(({ data }: ApiResponse<AddProductResponse>) => ({
+        __typename: 'AddProductResponse',
+        ...data,
+      }))
+    }
+
+    return response.json()
   },
 
   cancelProduct: async function (depositId: string, lineId: string): Promise<void> {
