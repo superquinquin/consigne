@@ -4,7 +4,7 @@ import type Deposit from '@/services/deposit.ts'
 import SearchUser from '@/components/SearchUser.vue'
 import { globalState } from '@/services/state.ts'
 
-const depositProvider: typeof Deposit = inject('DepositProvider')
+const depositProvider: typeof Deposit | undefined = inject('DepositProvider')
 
 type Returnable = {
   name: string
@@ -25,11 +25,13 @@ const depositState = reactive<{
   depositId?: number
   addProductLoading: boolean
   printTicketLoading: boolean
+  closeDepositLoading: boolean
 }>({
   returnGoods: [],
   barcode: '',
   addProductLoading: false,
   printTicketLoading: false,
+  closeDepositLoading: false,
 })
 
 const errorState = reactive<{ productName?: string; reasons?: string }>({
@@ -46,19 +48,19 @@ const currentTotalValue = () =>
   depositState.returnGoods.reduce((acc, current) => acc + current.value, 0)
 
 const queryForReturnable = async (barCode: string): Promise<Returnable | null> => {
-  const result = await depositProvider.addProduct(globalState.depositId, barCode)
+  const result = await depositProvider?.addProduct(globalState.depositId, barCode)
 
-  if (result.__typename === 'AddProductResponse') {
+  if (result?.data) {
     resetError()
 
     return {
-      name: result.name,
-      isReturnable: result.returnable,
-      value: result.return_value || 0,
+      name: result.data.name,
+      isReturnable: result.data.returnable,
+      value: result.data.return_value || 0,
     }
   }
 
-  errorState.reasons = result.reasons
+  errorState.reasons = result?.reasons
 
   return null
 }
@@ -93,29 +95,36 @@ const onSubmit = async (event?: KeyboardEvent) => {
 }
 
 const selectUser = (userId: number) => {
-  console.log(`Selected User : ${userId}`)
   globalState.providerCode = userId.toString()
 }
 
 const onPrint = async () => {
   depositState.printTicketLoading = true
-  void (await depositProvider.printTicket(globalState.depositId).finally(() => {
+  void (await depositProvider?.printTicket(globalState.depositId).finally(() => {
     depositState.printTicketLoading = false
   }))
 }
 
 const onEnd = async () => {
-  await depositProvider.close(globalState.depositId).finally(() => {
-    globalState.depositId = undefined
-    globalState.providerCode = ''
-    depositState.returnGoods = []
-  })
+  depositState.closeDepositLoading = true
+  await depositProvider
+    ?.close(globalState.depositId)
+    .then(({ status, reasons }) => {
+      if (status !== 200) {
+        errorState.reasons = reasons
+      } else {
+        globalState.depositId = undefined
+        globalState.providerCode = ''
+        depositState.returnGoods = []
+      }
+    })
+    .finally(() => (depositState.closeDepositLoading = false))
 }
 
 const createDeposit = async () => {
-  const result = await depositProvider.create(globalState.providerCode, globalState.receiverCode)
+  const result = await depositProvider?.create(globalState.providerCode, globalState.receiverCode)
 
-  if (result.deposit_id) {
+  if (result?.deposit_id) {
     globalState.depositId = result.deposit_id
   }
 }
@@ -210,20 +219,28 @@ const createDeposit = async () => {
           {{ errorState.reasons }}
         </div>
 
-        <div
-          class="text-black text-xl border-1 border-gray-300 rounded bg-white p-2 flex flex-col gap-2"
-        >
-          <div v-for="value in groupByBarcode()" :key="value.id">
-            ⋅ {{ value.quantity }} x {{ value.name }} - {{ value.value.toFixed(2) }} €
+        <div class="flex flex-col gap-4" v-if="depositState.returnGoods.length !== 0">
+          <div
+            class="text-black text-xl border-1 border-gray-300 rounded bg-white p-2 flex flex-col gap-2"
+          >
+            <div v-for="value in groupByBarcode()" :key="value.id">
+              ⋅ {{ value.quantity }} x {{ value.name }} - {{ value.value.toFixed(2) }} €
+            </div>
           </div>
+          <div class="text-black text-2xl">Total : {{ currentTotalValue().toFixed(2) }} €</div>
         </div>
-        <div class="text-black text-2xl">Total : {{ currentTotalValue().toFixed(2) }} €</div>
+
+        <div v-else>
+          <span class="text-black text-2xl">
+            Aucun produit consigné n'a été scanné pour le moment</span
+          >
+        </div>
 
         <div class="flex flex-row gap-8">
           <button @click="onPrint" type="button">
-            Print
+            <span v-if="!depositState.printTicketLoading">Imprimer le ticket</span>
             <svg
-              v-if="depositState.printTicketLoading"
+              v-else
               aria-hidden="true"
               role="status"
               class="inline w-4 h-4 me-3 text-black animate-spin"
@@ -241,7 +258,30 @@ const createDeposit = async () => {
               />
             </svg>
           </button>
-          <button @click="onEnd" type="button">End deposit</button>
+          <button @click="onEnd" type="button">
+            <span v-if="!depositState.closeDepositLoading">Mettre fin au dépôt</span>
+            <svg
+              v-else
+              class="animate-spin h-5 w-5"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          </button>
         </div>
       </div>
     </template>

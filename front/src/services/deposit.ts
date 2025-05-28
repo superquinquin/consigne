@@ -60,7 +60,7 @@ export default {
   addProduct: async function (
     depositId: string,
     productCode: string,
-  ): Promise<AddProductResponse | ApiError> {
+  ): Promise<ApiResponse<AddProductResponse | void>> {
     const response = await fetch(
       `http://localhost:8000/deposit/${depositId}/return/${productCode}`,
       {
@@ -69,14 +69,7 @@ export default {
       },
     )
 
-    if (response?.ok) {
-      return response.json().then(({ data }: ApiResponse<AddProductResponse>) => ({
-        __typename: 'AddProductResponse',
-        ...data,
-      }))
-    }
-
-    return response.json()
+    return response.json() as Promise<ApiResponse<AddProductResponse | void>>
   },
 
   cancelProduct: async function (depositId: string, lineId: string): Promise<void> {
@@ -97,12 +90,12 @@ export default {
     return response.json().then(({ data }: ApiResponse<void>) => data)
   },
 
-  close: async function (depositId: string): Promise<void> {
+  close: async function (depositId: string): Promise<ApiResponse<void>> {
     const response = await fetch(`http://localhost:8000/deposit/${depositId}/close`, {
       method: 'GET',
       headers: { 'content-type': 'application/json;charset=UTF-8' },
     })
 
-    return response.json().then(({ data }: ApiResponse<void>) => data)
+    return response.json()
   },
 }
