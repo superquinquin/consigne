@@ -22,8 +22,8 @@ const onSubmit = async () => {
     const result = await authProvider?.searchUser(search.value).then((data) =>
       data.data.matches?.map((item: [number, string]) => ({
         coopNumber: item[0],
-        firstName: item[1].split('-')[1].trim().split(',')[1],
-        lastName: item[1].split('-')[1].trim().split(',')[0],
+        firstName: item[1].split(' - ')[1].trim().split(',')[1],
+        lastName: item[1].split(' - ')[1].trim().split(',')[0],
         profilePictureUrl: undefined,
       })),
     )
