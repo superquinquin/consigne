@@ -1,8 +1,28 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { globalState } from './services/state'
+</script>
 
 <template>
   <header class="flex flex-row justify-between items-center">
-    <h1 class="text-black text-4xl">Retournez vos bouteilles ! 🔄</h1>
+    <div class="flex flex-col">
+      <h1 class="text-black text-4xl">Retournez vos bouteilles ! 🔄</h1>
+      <span v-if="!!globalState.receiver" class="text-black text-xl"
+        >Coopérateur en charge :
+        {{
+          globalState.receiver?.firstName && globalState.receiver?.lastName
+            ? globalState.receiver?.firstName + ' ' + globalState.receiver?.lastName
+            : globalState.receiver?.fullName
+        }}
+      </span>
+      <span v-if="!!globalState.provider" class="text-black text-xl"
+        >Coopérateur ramenant ses consignes :
+        {{
+          globalState.provider?.firstName && globalState.provider?.lastName
+            ? globalState.provider?.firstName + ' ' + globalState.provider?.lastName
+            : globalState.provider?.fullName
+        }}
+      </span>
+    </div>
     <img
       alt="Vue logo"
       class="logo"

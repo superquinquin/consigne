@@ -3,6 +3,7 @@ import { inject, reactive } from 'vue'
 import type Deposit from '@/services/deposit.ts'
 import SearchUser from '@/components/SearchUser.vue'
 import { globalState } from '@/services/state.ts'
+import type { User } from './services/users'
 
 const depositProvider: typeof Deposit | undefined = inject('DepositProvider')
 
@@ -94,8 +95,8 @@ const onSubmit = async (event?: KeyboardEvent) => {
   }
 }
 
-const selectUser = (userId: number) => {
-  globalState.providerCode = userId.toString()
+const selectUser = (user: User) => {
+  globalState.provider = user
 }
 
 const onPrint = async () => {
@@ -114,7 +115,7 @@ const onEnd = async () => {
         errorState.reasons = reasons
       } else {
         globalState.depositId = undefined
-        globalState.providerCode = ''
+        globalState.provider = undefined
         depositState.returnGoods = []
       }
     })
@@ -122,10 +123,15 @@ const onEnd = async () => {
 }
 
 const createDeposit = async () => {
-  const result = await depositProvider?.create(globalState.providerCode, globalState.receiverCode)
+  if (globalState.provider && globalState.receiver) {
+    const result = await depositProvider?.create(
+      globalState.provider.coopNumber,
+      globalState.receiver.coopNumber,
+    )
 
-  if (result?.deposit_id) {
-    globalState.depositId = result.deposit_id
+    if (result?.deposit_id) {
+      globalState.depositId = result.deposit_id
+    }
   }
 }
 </script>
@@ -144,7 +150,7 @@ const createDeposit = async () => {
         <SearchUser
           @select-user="selectUser"
           search-label="Sélectionner le coopérateur donnant ses consignes"
-          :selected-user-id="globalState.providerCode"
+          :selected-user-id="globalState.provider?.coopNumber.toString()"
         />
         <button @click="createDeposit" type="button">Démarrer le dépôt</button>
       </div>

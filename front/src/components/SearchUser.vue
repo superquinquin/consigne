@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { inject, reactive, ref } from 'vue'
-import AuthProvider, { type SearchUserResponse } from '@/services/authentication.ts'
 import UserCard from '@/components/UserCard.vue'
+import UsersProvider, { type User } from '@/services/users'
 
 defineProps<{
   searchLabel?: string
   selectedUserId?: string
 }>()
 
-const authProvider: typeof AuthProvider | undefined = inject('AuthProvider')
+const userProvider: typeof UsersProvider | undefined = inject('UsersProvider')
 const state = reactive({
   loading: false,
-  searchResult: undefined as SearchUserResponse | undefined,
+  searchResult: undefined as User[] | undefined,
 })
 
 const search = ref('')
@@ -19,14 +19,9 @@ const onSubmit = async () => {
   state.loading = true
 
   if (search.value) {
-    const result = await authProvider?.searchUser(search.value).then((data) =>
-      data.data.matches?.map((item: [number, string]) => ({
-        coopNumber: item[0],
-        firstName: item[1].split(' - ')[1].trim().split(',')[1],
-        lastName: item[1].split(' - ')[1].trim().split(',')[0],
-        profilePictureUrl: undefined,
-      })),
-    )
+    const result = await userProvider
+      ?.searchUser(search.value)
+      .then((data) => data.data.matches?.map(userProvider?.parseUser))
     if (result) {
       state.searchResult = result
     }
@@ -102,15 +97,9 @@ const onSubmit = async () => {
         class="p-2"
         v-for="item in state.searchResult"
         :key="item.coopNumber"
-        @click="$emit('select-user', item.coopNumber)"
+        @click="$emit('select-user', item)"
       >
-        <UserCard
-          :profile-picture-url="item.profilePictureUrl"
-          :first-name="item.firstName"
-          :last-name="item.lastName"
-          :coop-number="item.coopNumber"
-          :is-selected="selectedUserId === item.coopNumber.toString()"
-        />
+        <UserCard :user="item" :is-selected="selectedUserId === item.coopNumber.toString()" />
       </div>
     </div>
   </div>

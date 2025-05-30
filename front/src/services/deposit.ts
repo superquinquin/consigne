@@ -1,4 +1,4 @@
-import type { ApiError, ApiResponse } from '@/services/api.utils.ts'
+import type { ApiResponse } from '@/services/api.utils.ts'
 
 export type CreateResponse = {
   deposit_id: number
@@ -24,7 +24,7 @@ export type AddProductResponse = {
   return_value?: number
 }
 export default {
-  create: async function (providerCode: string, receiverCode: string): Promise<CreateResponse> {
+  create: async function (providerCode: number, receiverCode: number): Promise<CreateResponse> {
     const response = await fetch('http://localhost:8000/deposit/create', {
       method: 'POST',
       headers: {

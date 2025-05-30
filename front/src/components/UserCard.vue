@@ -1,14 +1,15 @@
 <script setup lang="ts">
-const { firstName, lastName, profilePictureUrl, coopNumber, isSelected } = defineProps<{
-  profilePictureUrl?: string
-  firstName: string
-  lastName: string
-  coopNumber: number
+import type { User } from '@/services/users'
+
+const { user, isSelected } = defineProps<{
+  user: User
   isSelected: boolean
 }>()
 
+const { coopNumber, firstName, lastName, fullName, profilePictureUrl } = user
+
 // Création de la photo (ou initiales si pas de photo)
-const initials = firstName.charAt(0) + lastName.charAt(0)
+const initials = `${firstName?.charAt(0) || 'N'}${lastName?.charAt(0) || 'D'}`
 </script>
 
 <template>
@@ -29,7 +30,9 @@ const initials = firstName.charAt(0) + lastName.charAt(0)
       {{ initials }}
     </div>
     <div class="mb-2">
-      <div class="font-bold text-lg mb-1 text-gray-600">{{ firstName }} {{ lastName }}</div>
+      <div class="font-bold text-lg mb-1 text-gray-600">
+        {{ firstName && lastName ? firstName + ' ' + lastName : fullName }}
+      </div>
       <div class="text-gray-500 text-sm">{{ coopNumber }}</div>
     </div>
   </div>

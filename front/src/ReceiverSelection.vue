@@ -4,6 +4,7 @@ import { reactive } from 'vue'
 import { globalState } from '@/services/state.ts'
 import SearchUser from '@/components/SearchUser.vue'
 import ShiftUsers from './components/ShiftUsers.vue'
+import type { User } from './services/users'
 
 const router = useRouter()
 
@@ -11,14 +12,14 @@ const loginState = reactive({
   loading: false,
 })
 
-const selectUser = (userId: number) => {
-  console.log(`Selected User : ${userId}`)
-  globalState.receiverCode = userId.toString()
+const selectUser = (receiver: User) => {
+  console.log(`Selected User : ${receiver}`)
+  globalState.receiver = receiver
 }
 
 const onSubmit = async () => {
   loginState.loading = true
-  if (globalState.receiverCode) {
+  if (globalState.receiver) {
     void router.replace({ path: '/deposit' }).then(console.log).catch(console.log)
   }
 }
@@ -32,20 +33,19 @@ const onSubmit = async () => {
           <SearchUser
             @select-user="selectUser"
             search-label="Sélectionner le coopérateur recevant les consignes"
-            :selected-user-id="globalState.receiverCode"
+            :selected-user-id="globalState.receiver?.coopNumber.toString()"
           />
           <ShiftUsers
             class="w-full"
             @select-user="selectUser"
-            :selected-user-id="globalState.receiverCode"
+            :selected-user-id="globalState.receiver?.coopNumber.toString()"
           />
 
           <button
             @click="onSubmit"
             class="bg-white text-black rounded"
-            :class="{ 'hover:bg-green-300 cursor-pointer': globalState.receiverCode !== '' }"
+            :class="{ 'hover:bg-green-300 cursor-pointer': !!globalState.receiver }"
             type="submit"
-            :disabled="globalState.receiverCode === ''"
           >
             Confirmer
             <svg

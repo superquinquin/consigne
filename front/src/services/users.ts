@@ -1,11 +1,41 @@
 import type { ApiResponse } from '@/services/api.utils.ts'
 
+/*
+ exemple:
+ [
+   [
+     1615,
+     "1615 - BAGLIN, Marine"
+   ],
+   [
+     2615,
+     "2615 - Enercoop HDF"
+   ],
+   [
+     615,
+     "615 - CAVAREC, Romain"
+   ],
+   [
+     615,
+     "615 - PEINGNEZ, Sabine, SZEREMETA, Rémi"
+   ]
+ ]
+*/
+
 export type SearchUserResponse = {
-  matches: any
+  matches: [number, string][]
 }
 
 export type GetShiftsUsersResponse = {
-  users: any
+  users: [number, string][]
+}
+
+export type User = {
+  coopNumber: number
+  firstName?: string
+  lastName?: string
+  fullName: string
+  profilePictureUrl?: string
 }
 
 export default {
@@ -30,5 +60,31 @@ export default {
     })
 
     return response.json()
+  },
+
+  parseUser: (apiUser: [number, string]): User => {
+    const [coopNumber, nameWithCoopNumber] = apiUser
+
+    const deduceFirstAndLastName = (
+      name: string,
+    ): { fullName: string; firstName?: string; lastName?: string } => {
+      const [_, nameWithoutCoopNumber] = name.split(' - ')
+      const splittedName = nameWithoutCoopNumber.trim().split(',')
+
+      if (splittedName.length === 2) {
+        return {
+          fullName: nameWithoutCoopNumber,
+          firstName: splittedName[1],
+          lastName: splittedName[0],
+        }
+      }
+
+      return { fullName: nameWithoutCoopNumber }
+    }
+
+    return {
+      coopNumber,
+      ...deduceFirstAndLastName(nameWithCoopNumber),
+    }
   },
 }
