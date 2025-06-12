@@ -7,7 +7,10 @@ from datetime import datetime, timedelta
 
 from typing import Any
 
-from src.exceptions import SameUserError
+from src.exceptions import (
+    SameUserError,
+    AlreadyCLosedDepositPrintError
+)
 
 from src.odoo import OdooConnector
 from src.database import ConsigneDatabase
@@ -162,6 +165,9 @@ class ConsigneEngine(object):
         """
         
         deposit = self.database.get_deposit_data(deposit_id)
+        if deposit.get("closed", False):
+            raise AlreadyCLosedDepositPrintError()
+
         receiver_id = deposit["deposit"]["receiver_id"]
         ean = deposit["deposit"].get("deposit_barcode", None)
         
@@ -256,7 +262,7 @@ class ConsigneEngine(object):
         while True:
             tasks_logger.info(f"TRACKING | Next process in {settings.frequency} secs")
             await asyncio.sleep(settings.frequency)
-            await self.track_bases()
+            await self.bases_tracker()
 
     async def bases_tracker(self) -> None:
         with self.odoo.make_session() as session:

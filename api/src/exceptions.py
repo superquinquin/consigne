@@ -14,3 +14,10 @@ class SameUserError(ConsigneException):
     def __init__(self) -> None:
         super().__init__(self.message)
 
+class AlreadyCLosedDepositPrintError(ConsigneException):
+    status_code: int = 500
+    internal_error_id: int = 1
+    message: str = "This deposit is closed. Ticket printer is blocked"
+
+    def __init__(self) -> None:
+        super().__init__(self.message)
