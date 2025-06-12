@@ -1,11 +1,16 @@
 
 
 from sanic import Request, Blueprint, HTTPResponse
-from sanic.response import json
+from sanic.response import json, empty
 
 from src.engine import ConsigneEngine
 
 consigneBp = Blueprint("consigneBp", url_prefix="/")
+
+
+@consigneBp.get("/favicon.ico")
+async def favicon(_: Request):
+    return empty()
 
 @consigneBp.route("/auth_provider", methods=["POST"])
 async def provider_login(request: Request) -> HTTPResponse:

@@ -128,7 +128,7 @@ class OdooSession(ContextDecorator):
         return (partner.id, partner.barcode_base, partner.name)
     
     def get_partner_record_from_code(self, code: int) -> tuple:
-        partner = self.get("res.partner", [("barcode_base", "=", code)])
+        partner = self.get("res.partner", [("barcode_base", "=", code), ("cooperative_state", "!=", "unsubscribed")])
         return (partner.id, partner.barcode_base, partner.name)
     
     def fuzzy_user_search(self, value: str) -> list[tuple[int, str]]:

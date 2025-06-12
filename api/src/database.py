@@ -230,7 +230,7 @@ class ConsigneDatabase:
         with self.session_maker() as session:
             stmt = (
                 update(Deposits)
-                .values(close=True)
+                .values(closed=True)
                 .where(Deposits.deposit_id == deposit_id)
             )
             session.execute(stmt)
