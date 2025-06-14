@@ -216,11 +216,11 @@ const createDeposit = async () => {
           </div>
         </div>
 
-        <div v-if="errorState.productName" class="text-red-500">
+        <div v-if="errorState.productName" class="text-xl text-red-500">
           {{ errorState.productName }} n'est pas consigné !
         </div>
 
-        <div v-if="errorState.reasons" class="text-red-500">
+        <div v-if="errorState.reasons" class="text-xl text-red-500">
           Une erreur semble avoir apparut :
           {{ errorState.reasons }}
         </div>
