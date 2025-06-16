@@ -192,15 +192,16 @@ class OdooSession(ContextDecorator):
         SHIFT_WINDOW_CEILING = os.environ.get("SHIFT_WINDOW_CEILING", 15) 
         debut, end = None, None
 
+        print(shifts)
         if len(shifts) == 1:
             shift = shifts[0]
             debut = datetime.fromisoformat(shift.date_begin_tz) + timedelta(minutes=SHIFT_WINDOW_FLOOR)
             end = datetime.fromisoformat(shift.date_end_tz) - timedelta(minutes=SHIFT_WINDOW_CEILING) 
 
         elif len(shifts) == 2:
-            first_shift, second_shift = shift[0], shift[1]
-            debut = datetime.fromisoformat(first_shift.date_end_tz) - timedelta(minutes=SHIFT_WINDOW_FLOOR)
-            end = datetime.fromisoformat(shift.second_shift) + timedelta(minutes=SHIFT_WINDOW_CEILING) 
+            first_shift, second_shift = shifts[0], shifts[1]
+            debut = datetime.fromisoformat(second_shift.date_begin_tz) - timedelta(minutes=SHIFT_WINDOW_FLOOR)
+            end = datetime.fromisoformat(first_shift.date_end_tz) + timedelta(minutes=SHIFT_WINDOW_CEILING) 
         return (debut, end)
 
     def get_shifts_members(self, shifts: RecordList) -> list[tuple[int, str]]:

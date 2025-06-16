@@ -31,7 +31,7 @@ def cached_shifts(f):
 
         zone = cache.get_shift_zone()
         members = cache.get("shift_users")
-
+        print(zone.debut, zone.end)
         now = datetime.now()
         if members is None or zone is None or now < zone.debut or now >= zone.end:
             current_zone, members = f(engine)
@@ -72,7 +72,7 @@ class ConsigneCache(HashClient):
         end = self.get("shift_zone_end")
         if not all([debut, end]):
             return None
-        return Type("Zone", (object,), {"debut": debut, "end": end})
+        return type("Zone", (object,), {"debut": debut, "end": end})
 
     def set_shift_zone(self, debut: datetime|None, end: datetime|None) -> None:
         self.set("shift_zone_debut", debut)
