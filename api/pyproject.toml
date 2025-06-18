@@ -9,6 +9,7 @@ dependencies = [
     "click>=8.1.8",
     "erppeek>=1.7.1",
     "pillow==9.5.0",
+    "psycopg2-binary>=2.9.10",
     "pymemcache>=4.0.0",
     "python-barcode>=0.15.1",
     "python-escpos>=3.1",
@@ -34,7 +35,7 @@ testpaths = ["tests"]
 omit = ["tests/*"]
 
 [build-system]
-requires = ["setuptools >= 77.0.3"]
+requires = ["setuptools == 66.1.1"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]

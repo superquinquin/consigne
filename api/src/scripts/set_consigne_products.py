@@ -129,12 +129,12 @@ class BuildingOdoo(OdooSession):
     
 
     def set_to_returnable(self, barcode: str, returnable:bool, returned: str) -> None:
-
         returns = self.get("product.product", [("name","=", returned)])
         p = self.get("product.product", [("barcode","=", str(barcode))])
 
         if not all([returns, p]):
-            raise ValueError("Unknown return_product or product.")
+            print(f">>> Failed to update product: {(barcode, returnable, returned)}")
+            return
 
         if returnable is True:        
             p.product_tmpl_id.returnable = True

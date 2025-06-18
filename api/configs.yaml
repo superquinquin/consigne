@@ -7,12 +7,20 @@ app:
       templating_path_to_templates: ./src/templates/
 
   database:
-    dialect: sqlite
-    database: database.db
+    dialect: postgresql
+    driver: psycopg2
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    host: ${DB_HOST}
+    port: ${DB_PORT}
+    database: ${DB_NAME}
+    
+    # dialect: sqlite
+    # database: database.db
 
   caching: 
     servers:
-      - host: 127.0.0.1
+      - host: memcached # 127.0.0.1
         port: 11211
     connect_timeout: 1
     timeout: 1
@@ -52,26 +60,234 @@ app:
           rule: 999....{NNNDD}
           
       returns:
-        - name: Pajot
+        - name: Consigne valeur 0.5
+          value: 0.5
+        - name: Consigne valeur 0.25
           value: 0.25
-        - name: Celtic
-          value: 0.20
-        - name: Club Maté
-          value: 0.20
-        - name: Bière 25/33cl
-          value: 0.10
-        - name: Bière 75cl
-          value: 0.20
-        - name: Lait
-          value: 0.50
-        # - name: Gaz
-        #   value: 10.0
+        - name: Consigne valeur 0.2
+          value: 0.2
+        - name: Consigne valeur 0.0
+          value: 0.0
+        - name: Consigne valeur 0.1
+          value: 0.1
 
       returnables:
-        - barcode: 5411087001029 # barcode of the returnable product 
-          returnable: True
-          returned: Pajot # name of the returns product possibly from returns
-
+        - barcode: 3760263440254
+          returnable: true
+          returned: Consigne valeur 0.5
+        - barcode: 5411087001562
+          returnable: true
+          returned: Consigne valeur 0.25
+        - barcode: 5411087001715
+          returnable: true
+          returned: Consigne valeur 0.25
+        - barcode: 5411087001166
+          returnable: true
+          returned: Consigne valeur 0.25
+        - barcode: 5411087001203
+          returnable: true
+          returned: Consigne valeur 0.25
+        - barcode: 5411087001043
+          returnable: true
+          returned: Consigne valeur 0.25
+        - barcode: 5411087001142
+          returnable: true
+          returned: Consigne valeur 0.25
+        - barcode: 5411087001357
+          returnable: true
+          returned: Consigne valeur 0.25
+        - barcode: 5411087001029
+          returnable: true
+          returned: Consigne valeur 0.25
+        - barcode: 5411087001012
+          returnable: true
+          returned: Consigne valeur 0.25
+        - barcode: 5411087001081
+          returnable: true
+          returned: Consigne valeur 0.25
+        - barcode: 5411087001104
+          returnable: true
+          returned: Consigne valeur 0.25
+        - barcode: 3361730666667
+          returnable: true
+          returned: Consigne valeur 0.2
+        - barcode: 3361730888885
+          returnable: true
+          returned: Consigne valeur 0.2
+        - barcode: 4029764001807
+          returnable: true
+          returned: Consigne valeur 0.2
+        - barcode: 3770006978234
+          returnable: true
+          returned: Consigne valeur 0.2
+        - barcode: 5410769100098
+          returnable: true
+          returned: Consigne valeur 0.2
+        - barcode: 5410702000515
+          returnable: true
+          returned: Consigne valeur 0.2
+        - barcode: 5410702000119
+          returnable: true
+          returned: Consigne valeur 0.2
+        - barcode: 5411858000152
+          returnable: true
+          returned: Consigne valeur 0.2
+        - barcode: 5411633750920
+          returnable: true
+          returned: Consigne valeur 0.2
+        - barcode: 5411663003317
+          returnable: true
+          returned: Consigne valeur 0.2
+        - barcode: 5410702000812
+          returnable: true
+          returned: Consigne valeur 0.2
+        - barcode: 3760035361688
+          returnable: true
+          returned: Consigne valeur 0.0
+        - barcode: 3760035360247
+          returnable: true
+          returned: Consigne valeur 0.0
+        - barcode: 3760035360018
+          returnable: true
+          returned: Consigne valeur 0.0
+        - barcode: 3760035361718
+          returnable: true
+          returned: Consigne valeur 0.0
+        - barcode: 3760035360360
+          returnable: true
+          returned: Consigne valeur 0.0
+        - barcode: 3760035361701
+          returnable: true
+          returned: Consigne valeur 0.0
+        - barcode: 3770014843074
+          returnable: true
+          returned: Consigne valeur 0.0
+        - barcode: 3770011861194
+          returnable: true
+          returned: Consigne valeur 0.0
+        - barcode: 3770011861187
+          returnable: true
+          returned: Consigne valeur 0.0
+        - barcode: 3770011861170
+          returnable: true
+          returned: Consigne valeur 0.0
+        - barcode: 5411879789128
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5413970200014
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5411633330054
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5410702001307
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5411065200864
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5411065200871
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5411065201809
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5410769100081
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5411681406039
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5411681401164
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5412138495019
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5412896006335
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5412896000029
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5410228142027
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5410228231325
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 8711406344538
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5411223030081
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5411223005256
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5410702000539
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 54040014
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 875213000044
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5412858000104
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5410702000836
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5410702000409
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5425029020016
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5425029020023
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5413023000974
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 54050082
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5411681401775
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5411681400310
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 4260107220015
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 4260107220022
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 4260107227960
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 4260107227977
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 4260107222415
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5407006760016
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5407006760085
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5407006760023
+          returnable: true
+          returned: Consigne valeur 0.1
+        - barcode: 5407006760030
+          returnable: true
+          returned: Consigne valeur 0.1
 
     erp:
       login: ${ERP_USERNAME}

@@ -50,7 +50,7 @@ class ConsigneEngine(object):
         if tasks is None:
             tasks = {}
         self.tasks = tasks
-        self.database.load_metadata(__name__)
+        # self.database.load_metadata(__name__)
 
     def initialize_return(self, receiver_code: int, provider_code: int) -> int:
         """
@@ -185,10 +185,9 @@ class ConsigneEngine(object):
         returns_per_types = self.database.get_returns_per_types(deposit_id)
         total_value = sum([r[2] for r in returns_per_types])
 
-        if ean is None:
-            base_id, base = self.database.next_barcode_base()
-            ean = generate_ean(total_value, base)
-            self.database.update_deposit_barcode(deposit_id, ean, base_id)
+        base_id, base = self.database.next_barcode_base()
+        ean = generate_ean(total_value, base)
+        self.database.update_deposit_barcode(deposit_id, ean, base_id)
 
         with self.printer.make_printer_session() as p:
             p.print_ticket(

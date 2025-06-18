@@ -192,7 +192,6 @@ class OdooSession(ContextDecorator):
         SHIFT_WINDOW_CEILING = os.environ.get("SHIFT_WINDOW_CEILING", 15) 
         debut, end = None, None
 
-        print(shifts)
         if len(shifts) == 1:
             shift = shifts[0]
             debut = datetime.fromisoformat(shift.date_begin_tz) + timedelta(minutes=SHIFT_WINDOW_FLOOR)

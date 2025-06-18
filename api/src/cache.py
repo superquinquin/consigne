@@ -31,7 +31,7 @@ def cached_shifts(f):
 
         zone = cache.get_shift_zone()
         members = cache.get("shift_users")
-        print(zone.debut, zone.end)
+
         now = datetime.now()
         if members is None or zone is None or now < zone.debut or now >= zone.end:
             current_zone, members = f(engine)
