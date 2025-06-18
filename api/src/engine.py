@@ -15,6 +15,7 @@ from src.exceptions import (
 from src.odoo import OdooConnector
 from src.database import ConsigneDatabase
 from src.ticket import ConsignePrinter
+from src.cache import ConsigneCache, cached_products, cached_shifts, cached_users
 from src.utils import generate_ean
 
 tasks_logger = logging.getLogger("tasks")
@@ -30,23 +31,26 @@ class ConsigneEngine(object):
     odoo: OdooConnector
     database: ConsigneDatabase
     printer: ConsignePrinter
+    cache: ConsigneCache
     tasks: dict[str,TaskConfigs]
 
     def __init__(
         self, 
         odoo: OdooConnector, 
         database: ConsigneDatabase, 
-        printer: ConsignePrinter, 
+        printer: ConsignePrinter,
+        cache: ConsigneCache,
         tasks: dict[str, TaskConfigs]=None
     ) -> None:
         self.odoo = odoo
         self.database = database
         self.printer = printer
+        self.cache = cache
 
         if tasks is None:
             tasks = {}
         self.tasks = tasks
-        self.database.load_metadata(__name__)
+        # self.database.load_metadata(__name__)
 
     def initialize_return(self, receiver_code: int, provider_code: int) -> int:
         """
@@ -84,16 +88,9 @@ class ConsigneEngine(object):
         deposit = self.database.add_deposit(receiver_user_id, provider_user_id)
         deposit_id = deposit.get("deposit_id")
         return deposit_id
-        
-    def return_product(self, deposit_id: int, barcode: str) -> dict[str, Any]:
-        """
-        1. search for product
-        2. define returnability & product_return
-        3. update database with product_return & deposit_line
-        4. return operation result:
-            * success -> returned product data
-            * failed -> Non returnable product message.
-        """
+    
+    @cached_products
+    def fetch_product(self, deposit_id: int, barcode: str):
         with self.odoo.make_session() as session:
             product = session.get_product_from_barcode(barcode)
             product_data = session.product_to_record(product)
@@ -110,7 +107,19 @@ class ConsigneEngine(object):
                     db_product_return = self.database.add_product_return(opid, name, returnable, return_value)
 
                 return_product_id = db_product_return.get("product_return_id")
+        return (returnable, return_value,  product_data, return_product_id)
                 
+    
+    def return_product(self, deposit_id: int, barcode: str) -> dict[str, Any]:
+        """
+        1. search for product
+        2. define returnability & product_return
+        3. update database with product_return & deposit_line
+        4. return operation result:
+            * success -> returned product data
+            * failed -> Non returnable product message.
+        """
+        returnable, return_value,  product_data, return_product_id = self.fetch_product(deposit_id, barcode)
         # -- SEARCH PRODUCT REFERENCE 
         opid, name, _ = product_data
         db_product = self.database.get_product_from_opid(opid)
@@ -176,10 +185,9 @@ class ConsigneEngine(object):
         returns_per_types = self.database.get_returns_per_types(deposit_id)
         total_value = sum([r[2] for r in returns_per_types])
 
-        if ean is None:
-            base_id, base = self.database.next_barcode_base()
-            ean = generate_ean(total_value, base)
-            self.database.update_deposit_barcode(deposit_id, ean, base_id)
+        base_id, base = self.database.next_barcode_base()
+        ean = generate_ean(total_value, base)
+        self.database.update_deposit_barcode(deposit_id, ean, base_id)
 
         with self.printer.make_printer_session() as p:
             p.print_ticket(
@@ -190,12 +198,14 @@ class ConsigneEngine(object):
                 ean=ean
             )
 
+    @cached_shifts
     def get_shifts_users(self) -> list[tuple[int, str]]:
         """get current shift users. return list of barcodebase, display_name"""
         with self.odoo.make_session() as session:
             res = session.get_current_shifts_members()
         return res
 
+    @cached_users
     def search_user(self, value: str) -> list[tuple[int, str]]:
         """fuzzy search for the user."""
         with self.odoo.make_session() as session:
@@ -242,7 +252,7 @@ class ConsigneEngine(object):
                     # NO MATCH = ANOMALY
                     self.database.add_redeem(pos_id, datetime.fromisoformat(dt), user_id, value, barcode, True)
 
-    async def ticket_emissions_analyze(self) -> None:
+    async def ticket_emissions_analyzer(self) -> None:
         settings = self.tasks.get("analyzer", None)
         if settings is None:
             raise ValueError("Analyzer settings must be set to run the ticket emissions analysis")

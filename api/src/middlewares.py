@@ -1,11 +1,12 @@
 
+
 import logging
 import traceback
 from time import perf_counter
 from sanic import Request
 from sanic.response import HTTPResponse, json
 
-
+from typing import Any
 
 logger = logging.getLogger("endpointAccess")
 
@@ -34,3 +35,6 @@ async def log_exit(request: Request, response: HTTPResponse) -> None:
         logger.info(
             f"{request.host} > {request.method} {request.url} [{request.load_json()}][{str(response.status)}][{str(len(response.body))}b][{perf}s]"
         )
+
+
+

@@ -76,6 +76,7 @@ async def get_deposit(request: Request, deposit_id: int) -> HTTPResponse:
     """
     engine: ConsigneEngine = request.app.ctx.engine
     res = engine.get_deposit_data(deposit_id)
+    print(res)
     return json({"status": 200, "reasons": "OK", "data": res})
 
 @consigneBp.route("/deposit/<deposit_id:int>/<deposit_line_id:int>", methods=["GET"])
@@ -147,7 +148,7 @@ async def search_user(request: Request) -> HTTPResponse:
     return json({"status": 200, "reasons": "OK", "data": {"matches": res}})
 
 @consigneBp.route("/get-shifts-users", methods=["GET"])
-async def get_shifts_users(self, request: Request) -> HTTPResponse:
+async def get_shifts_users(request: Request) -> HTTPResponse:
     engine: ConsigneEngine = request.app.ctx.engine
     users = engine.get_shifts_users()
     return json({"status": 200, "reasons": "OK", "data": {"users": users}})

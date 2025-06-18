@@ -1,11 +1,12 @@
+import re
 import sys
 from datetime import datetime
 from sqlalchemy import Row, create_engine, select, insert, update, Result, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, decl_api
 from sqlalchemy import MetaData, Engine, Table
 from sqlalchemy.sql.selectable import Select
 
-from typing import Any, Optional, Literal, Callable
+from typing import Any, Optional, Literal, Callable, Type
 
 """
 Schema is loaded dynamically using `ConsigneDatabase.load_metadata` method
@@ -14,6 +15,9 @@ As schemas are dynamic objects, for clarity we set: pyright: reportUndefinedVari
 """
 
 # pyright: reportUndefinedVariable=false
+
+
+from src.schema import Base
 
 class ConsigneDatabase:
     dialect: str
@@ -45,9 +49,10 @@ class ConsigneDatabase:
         self.username = username
         self.password = password
 
+        # self._prepare()
         self._engine = create_engine(self.uri)
-        self._metadata = MetaData()
-        self._metadata.reflect(self._engine)
+        Base.metadata.create_all(self._engine, checkfirst=True)
+        self._metadata = Base.metadata
         self.session_maker = sessionmaker(bind=self._engine)
 
         self.load_metadata(__name__)
@@ -63,12 +68,14 @@ class ConsigneDatabase:
             access = f"{self.username}:{self.password}@{self.host}:{int(self.port)}"
         return f"{engine}://{access}/{self.database}"
 
+
+
     def load_metadata(self, module_name: str) -> None:
-        for k, v in self._metadata.tables.items():
-            k_up = k[0].upper() + k[1:]
-            table = Table(k, self._metadata)
-            [setattr(table, cname, c) for cname,c in table.columns.items()]    
-            sys.modules[module_name].__dict__.update({k_up:table})            
+        
+        for k,v in self._metadata.tables.items():
+            name = re.sub(r"[Mm]ain\.","", k)
+            capitalized_name = name[0].upper() + name[1:]
+            sys.modules[module_name].__dict__.update({capitalized_name:v})            
 
     def _collect(self, result: Result, fetch: Literal["one", "all"], as_dict: bool=True, serialize: bool=True) -> dict[str, Any]|None:
         collect: Callable = getattr(Result, f"fetch{fetch}")
@@ -93,7 +100,7 @@ class ConsigneDatabase:
                     last_provider_activity=None,
                     last_receiver_activity=None
                 )
-                .returning(Users.user_id)
+                .returning(Users.c.user_id)
             )
             res = session.execute(stmt).fetchone()._asdict()
             session.commit()
@@ -108,7 +115,7 @@ class ConsigneDatabase:
         with self.session_maker() as session:
             stmt = (
                 update(Users)
-                .where(Users.user_id == user_id)
+                .where(Users.c.user_id == user_id)
                 .values({field:datetime.now().isoformat("-")})
             )
             session.execute(stmt)
@@ -119,7 +126,7 @@ class ConsigneDatabase:
             stmt = (
                 select(Users)
                 .select_from(Users)
-                .where(Users.user_code == code)
+                .where(Users.c.user_code == code)
             )
             res = session.execute(stmt)
         return self._collect(res, "one")
@@ -129,7 +136,7 @@ class ConsigneDatabase:
             stmt = (
                 select(Users)
                 .select_from(Users)
-                .where(Users.user_id == user_id)
+                .where(Users.c.user_id == user_id)
             )
             res = session.execute(stmt)
         return self._collect(res, "one")
@@ -145,7 +152,7 @@ class ConsigneDatabase:
                     barcode=barcode, 
                     product_return_id=return_product_id
                 )
-                .returning(Products.product_id))
+                .returning(Products.c.product_id))
             res = session.execute(stmt).fetchone()._asdict()
             session.commit()
         return res
@@ -160,7 +167,7 @@ class ConsigneDatabase:
                     returnable=returnable,
                     return_value=return_value
                 )
-                .returning(Product_returns.product_return_id)
+                .returning(Product_returns.c.product_return_id)
             )
             res = session.execute(stmt).fetchone()._asdict()
             session.commit()
@@ -173,7 +180,7 @@ class ConsigneDatabase:
                 .values(deposit_barcode=ean, 
                         deposit_barcode_base_id=barcode_base_id
                 )
-                .where(Deposits.deposit_id == deposit_id)
+                .where(Deposits.c.deposit_id == deposit_id)
             )
             session.execute(stmt)
             session.commit()
@@ -182,8 +189,8 @@ class ConsigneDatabase:
         with self.session_maker() as session:
             stmt = (
                 update(Deposits)
-                .values(redeemed==redeem_id)
-                .where(Deposits.deposit_id == deposit_id)
+                .values(Deposits.c.redeemed==redeem_id)
+                .where(Deposits.c.deposit_id == deposit_id)
             )
             session.execute(stmt)
             session.commit()
@@ -192,7 +199,7 @@ class ConsigneDatabase:
         with self.session_maker() as session:
             stmt = (
                 select(Products)
-                .where(Products.odoo_product_id == opid)
+                .where(Products.c.odoo_product_id == opid)
             )
             res = session.execute(stmt)
         return self._collect(res, "one")
@@ -201,7 +208,7 @@ class ConsigneDatabase:
         with self.session_maker() as session:
             stmt = (
                 select(Product_returns)
-                .where(Product_returns.odoo_product_return_id == opid)
+                .where(Product_returns.c.odoo_product_return_id == opid)
             )
             res = session.execute(stmt)
         return self._collect(res, "one")
@@ -219,7 +226,7 @@ class ConsigneDatabase:
                     deposit_barcode=None,
                     redeemed=None
                 )
-                .returning(Deposits.deposit_id)
+                .returning(Deposits.c.deposit_id)
             )
             res = session.execute(stmt).fetchone()._asdict()
             session.commit()
@@ -231,7 +238,7 @@ class ConsigneDatabase:
             stmt = (
                 update(Deposits)
                 .values(closed=True)
-                .where(Deposits.deposit_id == deposit_id)
+                .where(Deposits.c.deposit_id == deposit_id)
             )
             session.execute(stmt)
             session.commit()
@@ -246,7 +253,7 @@ class ConsigneDatabase:
                     deposit_line_datetime=datetime.now().isoformat("-"),
                     canceled=canceled,
                 )
-                .returning(Deposit_lines.deposit_line_id)
+                .returning(Deposit_lines.c.deposit_line_id)
             )
             res = session.execute(stmt).fetchone()._asdict()
             session.commit()
@@ -257,8 +264,8 @@ class ConsigneDatabase:
             stmt = (
                 update(Deposit_lines)
                 .values(canceled=True)
-                .where(Deposit_lines.deposit_id == deposit_id)
-                .where(Deposit_lines.deposit_line_id == deposit_line_id)
+                .where(Deposit_lines.c.deposit_id == deposit_id)
+                .where(Deposit_lines.c.deposit_line_id == deposit_line_id)
             )
             session.execute(stmt)
             session.commit()
@@ -269,7 +276,7 @@ class ConsigneDatabase:
         with self.session_maker() as session:
             stmt = (
                 select(Deposits)
-                .where(Deposits.deposit_id == 1)
+                .where(Deposits.c.deposit_id == 1)
             )
             deposit = self._collect(session.execute(stmt), "one")
             if deposit is None:
@@ -280,7 +287,7 @@ class ConsigneDatabase:
         with self.session_maker() as session:
             stmt = (
                 select(Redeem)
-                .order_by(Redeem.redeem_id.desc())
+                .order_by(Redeem.c.redeem_id.desc())
                 .limit(1)
             )
             redeem = self._collect(session.execute(stmt), "one")
@@ -291,7 +298,7 @@ class ConsigneDatabase:
     def get_tracked_consigne_barcodes_bases(self) -> list[str]:
         with self.session_maker() as session:
             stmt = (
-                select(Consigne.consigne_barcode_base)
+                select(Consigne.c.consigne_barcode_base)
                 .select_from(Consigne)
             )
             redeem = self._collect(session.execute(stmt), "all")
@@ -302,22 +309,24 @@ class ConsigneDatabase:
         with self.session_maker() as session:
             stmt = (
                 select(Deposits)
-                .where(Deposits.deposit_id == deposit_id)
+                .where(Deposits.c.deposit_id == deposit_id)
             )
+
             deposit = self._collect(session.execute(stmt), "one")
+
             if deposit is None:
                 return deposit
             
-            receiver_id = deposit.get("reciever_id")
+            receiver_id = deposit.get("receiver_id")
             provider_id = deposit.get("provider_id")
 
             reciever_stmt = (
                 Select(Users)
-                .where(Users.user_id == receiver_id)
+                .where(Users.c.user_id == receiver_id)
             )
             provider_stmt = (
                 Select(Users)
-                .where(Users.user_id == provider_id)
+                .where(Users.c.user_id == provider_id)
             )
 
             receiver = self._collect(session.execute(reciever_stmt),"one")
@@ -328,7 +337,7 @@ class ConsigneDatabase:
                 .select_from(Deposit_lines)
                 .join(Products)
                 .join(Product_returns)
-                .where(Deposit_lines.deposit_id == deposit_id)
+                .where(Deposit_lines.c.deposit_id == deposit_id)
             )
             deposit_lines = self._collect(session.execute(stmt), "all")
 
@@ -346,8 +355,8 @@ class ConsigneDatabase:
                 select(Deposit_lines)
                 .join(Products)
                 .join(Product_returns)
-                .where(Deposit_lines.deposit_id == deposit_id)
-                .where(Deposit_lines.deposit_line_id == deposit_line_id)
+                .where(Deposit_lines.c.deposit_id == deposit_id)
+                .where(Deposit_lines.c.deposit_line_id == deposit_line_id)
             )
             res = session.execute(stmt)
         return self._collect(res, "one")
@@ -357,15 +366,15 @@ class ConsigneDatabase:
             SELECT 
                 product_returns.product_return_name, 
                 COUNT(deposit_line_id), 
-                ROUND(SUM(product_returns.return_value), 2)
-            FROM deposit_lines 
-            JOIN products ON deposit_lines.product_id=products.product_id 
-            JOIN product_returns ON products.product_return_id=product_returns.product_return_id 
+                ROUND(CAST(SUM(product_returns.return_value) AS NUMERIC), 2)
+            FROM main.deposit_lines 
+            JOIN main.products ON main.deposit_lines.product_id=main.products.product_id 
+            JOIN main.product_returns ON main.products.product_return_id=main.product_returns.product_return_id 
             WHERE 
                 deposit_id = :did
-                AND canceled = 0 
-                AND product_returns.product_return_id != 1
-            GROUP BY products.product_return_id;
+                AND canceled = False 
+                AND main.product_returns.product_return_id != 1
+            GROUP BY products.product_return_id, product_returns.product_return_name;
             """
 
         with self.session_maker() as session:
@@ -376,20 +385,20 @@ class ConsigneDatabase:
     def match_redeem_deposits(self, barcode: str, partner_id: int, value: float) -> dict[str, Any] | None: 
         POS_REDEEM_MATCHING = """\
             SELECT 
-                deposits.deposit_id,
-                ROUND(SUM(product_returns.return_value), 2)
-            FROM deposits
-            JOIN deposit_lines ON deposit_lines.deposit_id=deposits.deposit_id
-            JOIN users ON users.user_id=deposits.receiver_id as rc
-            JOIN products ON deposit_lines.product_id=products.product_id 
-            JOIN product_returns ON products.product_return_id=product_returns.product_return_id 
+                deposits.deposit_id
+            FROM main.deposits
+            JOIN main.deposit_lines ON main.deposit_lines.deposit_id=main.deposits.deposit_id
+            JOIN main.users ON main.users.user_id=deposits.receiver_id
+            JOIN main.products ON main.deposit_lines.product_id=main.products.product_id 
+            JOIN main.product_returns ON main.products.product_return_id=main.product_returns.product_return_id 
             WHERE
                 deposits.deposit_barcode = :barcode
-                AND rc.user_partner_id = :pid
-                AND sum = :value
-                AND deposit.closed = 1
+                AND user_partner_id = :pid
+                AND deposits.redeemed IS NULL
+                AND deposits.closed = True
             GROUP BY deposits.deposit_id
-            ORDER BY deposit_id
+            HAVING ROUND(CAST(SUM(product_returns.return_value) AS NUMERIC), 2) = :value
+            ORDER BY deposit_id;
             """
         with self.session_maker() as session:
             res = session.execute(text(POS_REDEEM_MATCHING), {'pid':partner_id, "barcode": barcode, "value": value}).fetchall()
@@ -407,7 +416,7 @@ class ConsigneDatabase:
                     redeem_barcode=barcode,
                     anomaly=anomaly,
                 )
-                .returning(Redeem.redeem_id)                
+                .returning(Redeem.c.redeem_id)                
             )
             res = session.execute(stmt).fetchone()._asdict()
             session.commit()
@@ -416,9 +425,9 @@ class ConsigneDatabase:
     def _update_consigne_barcodes(self, records: tuple) -> None:
         with self.session_maker() as session:
             stmt = (
-                select(Consigne.consigne_barcode_base)
-                .select_from(Consigne)
+                select(Consigne.c.consigne_barcode_base)
             )
+
             bases = [r[0] for r in session.execute(stmt).fetchall()]
             for base, barcode, name, sale_ok in records:
                 if base not in bases and sale_ok:
@@ -432,12 +441,11 @@ class ConsigneDatabase:
                         )
                     )
                     session.execute(stmt)
-                
                 elif base in bases and sale_ok is False:
                     stmt = (
                         update(Consigne)
                         .values(consigne_active=False)
-                        .where(Consigne.consigne_barcode_base == base)
+                        .where(Consigne.c.consigne_barcode_base == base)
                     )
                     session.execute(stmt)
             session.commit()
@@ -446,9 +454,9 @@ class ConsigneDatabase:
     def next_barcode_base(self) -> tuple[int, str]:
         with self.session_maker() as session:
             stmt = (
-                select(Deposits.deposit_barcode_base_id)
-                .where(Deposits.deposit_barcode_base_id != None)
-                .order_by(Deposits.deposit_id.desc())
+                select(Deposits.c.deposit_barcode_base_id)
+                .where(Deposits.c.deposit_barcode_base_id != None)
+                .order_by(Deposits.c.deposit_id.desc())
                 .limit(1)
                 
             )
@@ -469,9 +477,9 @@ class ConsigneDatabase:
     def _get_base(self, consigne_id: int) -> int|None:
         with self.session_maker() as session:
             stmt = (
-                select(Consigne.consigne_barcode_base)
+                select(Consigne.c.consigne_barcode_base)
                 .select_from(Consigne)
-                .where(Consigne.consigne_id == consigne_id)
+                .where(Consigne.c.consigne_id == consigne_id)
             )
             res = session.execute(stmt).fetchone()
         if res:

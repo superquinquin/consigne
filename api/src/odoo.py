@@ -187,6 +187,22 @@ class OdooSession(ContextDecorator):
         shifts = self.browse("shift.shift", [("date_begin_tz", ">=", begin), ("date_begin_tz", "<=", end), ("shift_type_id.id", "=", 1)])
         return shifts
 
+    def get_shift_zone(self, shifts: RecordList) -> tuple[datetime|None, datetime|None]:
+        SHIFT_WINDOW_FLOOR = os.environ.get("SHIFT_WINDOW_FLOOR", 15)
+        SHIFT_WINDOW_CEILING = os.environ.get("SHIFT_WINDOW_CEILING", 15) 
+        debut, end = None, None
+
+        if len(shifts) == 1:
+            shift = shifts[0]
+            debut = datetime.fromisoformat(shift.date_begin_tz) + timedelta(minutes=SHIFT_WINDOW_FLOOR)
+            end = datetime.fromisoformat(shift.date_end_tz) - timedelta(minutes=SHIFT_WINDOW_CEILING) 
+
+        elif len(shifts) == 2:
+            first_shift, second_shift = shifts[0], shifts[1]
+            debut = datetime.fromisoformat(second_shift.date_begin_tz) - timedelta(minutes=SHIFT_WINDOW_FLOOR)
+            end = datetime.fromisoformat(first_shift.date_end_tz) + timedelta(minutes=SHIFT_WINDOW_CEILING) 
+        return (debut, end)
+
     def get_shifts_members(self, shifts: RecordList) -> list[tuple[int, str]]:
         current_members = []
         for shift in shifts:
@@ -198,5 +214,9 @@ class OdooSession(ContextDecorator):
     
     def get_current_shifts_members(self) -> list[tuple[int, str]]:
         shifts = self.get_current_shifts()
-        members = self.get_shifts_members(shifts)
-        return members
+        zone = self.get_shift_zone(shifts)
+        if len(shifts) == 0:
+            members = []
+        else:
+            members = self.get_shifts_members(shifts)
+        return (zone, members)

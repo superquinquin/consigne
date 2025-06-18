@@ -4,6 +4,8 @@ from __future__ import annotations
 import os
 from sanic import Sanic
 from sanic.log import LOGGING_CONFIG_DEFAULTS
+from pymemcache.client.retrying import RetryingClient
+from pymemcache.exceptions import MemcacheUnexpectedCloseError
 
 
 from pathlib import Path
@@ -14,13 +16,13 @@ from typing import Any, Literal
 from src.parsers import get_config
 from src.routes import consigneBp
 from src.middlewares import error_handler, go_fast, log_exit
-from src.listeners import start_redeem_analizer, start_barcode_tracking, initialize_barcode_bases
+from src.listeners import start_redeem_analizer, start_barcode_tracking, initialize_barcode_bases, thread_state_manager
 
 from src.odoo import OdooConnector
 from src.database import ConsigneDatabase
 from src.ticket import ConsignePrinter, UsbSettings, NetworkSettings
+from src.cache import ConsigneCache
 from src.engine import ConsigneEngine, TaskConfigs
-
 
 
 StrOrPath = str|Path
@@ -71,18 +73,30 @@ class Consigne:
             raise KeyError("Missing configuration for odoo erp.")
 
         tasks_settings = cls.parse_tasks_settings(tasks)
-
+        
+        if caching:
+            caching = cls.reformat_caching_configs(caching)
+            base_cache = ConsigneCache(**caching)
+            cache = RetryingClient(
+                base_cache,
+                attempts=3,
+                retry_delay=0.01,
+                retry_for=[MemcacheUnexpectedCloseError],
+            )
+        else:
+            cache = None
         connector = OdooConnector(**erp)
         consigne_database = ConsigneDatabase(**database)
         consigne_printer = ConsignePrinter.from_configs(**printer)
-        engine = ConsigneEngine(connector, consigne_database, consigne_printer, tasks_settings)
-        
+        engine = ConsigneEngine(connector, consigne_database, consigne_printer, cache, tasks_settings)
+
         app.ctx.engine = engine
         consigne = cls(app, engine, env)
 
-        await initialize_barcode_bases(app)
-        await start_redeem_analizer(app)
-        await start_barcode_tracking(app)
+        app.register_listener(thread_state_manager, "main_process_start")
+        app.register_listener(initialize_barcode_bases, "before_server_start")
+        app.register_listener(start_barcode_tracking, "before_server_start")
+        app.register_listener(start_redeem_analizer, "before_server_start")
         return consigne.app
 
     @classmethod
@@ -116,6 +130,12 @@ class Consigne:
         if tasks is None:
             return {}
         return {k:TaskConfigs(**v) for k,v in tasks.items()}
+    
+    @staticmethod
+    def reformat_caching_configs(caching: dict[str, Any]) -> dict[str, Any]:
+        caching.update({"servers": [(s["host"], s["port"]) for s in caching.get("servers")]})
+        return caching
+
 
 if __name__ == "__main__":
     Consigne.create_app("configs.yaml")
