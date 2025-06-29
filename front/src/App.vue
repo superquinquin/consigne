@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { globalState } from './services/state'
+import {getGlobalState} from "@/services/state.ts";
+
+const globalState = getGlobalState();
 </script>
 
 <template>

@@ -1,20 +1,20 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { reactive } from 'vue'
-import { globalState } from '@/services/state.ts'
 import SearchUser from '@/components/SearchUser.vue'
 import ShiftUsers from './components/ShiftUsers.vue'
 import type { User } from './services/users'
+import {getGlobalState, setGlobalState} from "@/services/state.ts";
 
 const router = useRouter()
-
+const globalState = getGlobalState()
 const loginState = reactive({
   loading: false,
 })
 
 const selectUser = (receiver: User) => {
-  console.log(`Selected User : ${receiver}`)
   globalState.receiver = receiver
+  setGlobalState(globalState)
 }
 
 const onSubmit = async () => {

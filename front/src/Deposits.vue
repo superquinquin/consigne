@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { inject, reactive } from 'vue'
+import {inject, reactive} from 'vue'
 import type Deposit from '@/services/deposit.ts'
 import SearchUser from '@/components/SearchUser.vue'
-import { globalState } from '@/services/state.ts'
-import type { User } from './services/users'
+import type {User} from './services/users'
+import {getGlobalState, setGlobalState} from "@/services/state.ts";
 
+const globalState = getGlobalState()
 const depositProvider: typeof Deposit | undefined = inject('DepositProvider')
 
 type Returnable = {
@@ -49,19 +50,23 @@ const currentTotalValue = () =>
   depositState.returnGoods.reduce((acc, current) => acc + current.value, 0)
 
 const queryForReturnable = async (barCode: string): Promise<Returnable | null> => {
-  const result = await depositProvider?.addProduct(globalState.depositId, barCode)
+  if (globalState.depositId) {
+    const result = await depositProvider?.addProduct(globalState.depositId, barCode)
 
-  if (result?.data) {
-    resetError()
+    if (result?.data) {
+      resetError()
 
-    return {
-      name: result.data.name,
-      isReturnable: result.data.returnable,
-      value: result.data.return_value || 0,
+      return {
+        name: result.data.name,
+        isReturnable: result.data.returnable,
+        value: result.data.return_value || 0,
+      }
     }
-  }
 
-  errorState.reasons = result?.reasons
+    errorState.reasons = result?.reasons
+
+    return null
+  }
 
   return null
 }
@@ -97,29 +102,36 @@ const onSubmit = async (event?: KeyboardEvent) => {
 
 const selectUser = (user: User) => {
   globalState.provider = user
+  setGlobalState(globalState)
 }
 
 const onPrint = async () => {
-  depositState.printTicketLoading = true
-  void (await depositProvider?.printTicket(globalState.depositId).finally(() => {
-    depositState.printTicketLoading = false
-  }))
+  if (globalState.depositId) {
+    depositState.printTicketLoading = true
+    void (await depositProvider?.printTicket(globalState.depositId).finally(() => {
+      depositState.printTicketLoading = false
+    }))
+  }
 }
 
 const onEnd = async () => {
-  depositState.closeDepositLoading = true
-  await depositProvider
-    ?.close(globalState.depositId)
-    .then(({ status, reasons }) => {
-      if (status !== 200) {
-        errorState.reasons = reasons
-      } else {
-        globalState.depositId = undefined
-        globalState.provider = undefined
-        depositState.returnGoods = []
-      }
-    })
-    .finally(() => (depositState.closeDepositLoading = false))
+  if (globalState.depositId) {
+
+    depositState.closeDepositLoading = true
+    await depositProvider
+      ?.close(globalState.depositId)
+      .then(({status, reasons}) => {
+        if (status !== 200) {
+          errorState.reasons = reasons
+        } else {
+          globalState.depositId = undefined
+          globalState.provider = undefined
+          setGlobalState(globalState)
+          depositState.returnGoods = []
+        }
+      })
+      .finally(() => (depositState.closeDepositLoading = false))
+  }
 }
 
 const createDeposit = async () => {
@@ -131,6 +143,7 @@ const createDeposit = async () => {
 
     if (result?.deposit_id) {
       globalState.depositId = result.deposit_id
+      setGlobalState(globalState)
     }
   }
 }
@@ -144,7 +157,7 @@ const createDeposit = async () => {
       Afin de tester, essayez les codes barres suivant : 3770000661170, 5411087001562,
       3361730666667, 3770000661071
     </div>
-    <br />
+    <br/>
     <template v-if="!globalState.depositId">
       <div class="flex flex-col gap-2 px-auto">
         <SearchUser
