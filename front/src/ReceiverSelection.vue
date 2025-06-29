@@ -20,7 +20,7 @@ const selectUser = (receiver: User) => {
 const onSubmit = async () => {
   loginState.loading = true
   if (globalState.receiver) {
-    void router.replace({ path: '/deposit' }).then(console.log).catch(console.log)
+    await router.push({ path: '/deposit' }).then(console.log).catch(console.log)
   }
 }
 </script>

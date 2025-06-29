@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import {getGlobalState} from "@/services/state.ts";
+import {getGlobalState, setGlobalState} from "@/services/state.ts";
 
 const globalState = getGlobalState();
+
+const resetCoop = () => {
+  setGlobalState({
+    receiver: undefined,
+    provider: undefined,
+  })
+};
 </script>
 
 <template>
@@ -24,6 +31,7 @@ const globalState = getGlobalState();
             : globalState.provider?.fullName
         }}
       </span>
+      <button v-if="!!globalState.receiver || !!globalState.provider" class="" type="button" @click="resetCoop()">Changer les coopérateurs</button>
     </div>
     <img
       alt="Vue logo"

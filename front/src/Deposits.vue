@@ -1,12 +1,20 @@
 <script setup lang="ts">
-import {inject, reactive} from 'vue'
+import {inject, reactive, watch} from 'vue'
 import type Deposit from '@/services/deposit.ts'
 import SearchUser from '@/components/SearchUser.vue'
 import type {User} from './services/users'
 import {getGlobalState, setGlobalState} from "@/services/state.ts";
+import {useRouter} from "vue-router";
 
 const globalState = getGlobalState()
 const depositProvider: typeof Deposit | undefined = inject('DepositProvider')
+const router = useRouter()
+
+watch(() => globalState.receiver, async (receiver) => {
+  if (!receiver) {
+    await router.push({path: '/'})
+  }
+})
 
 type Returnable = {
   name: string
