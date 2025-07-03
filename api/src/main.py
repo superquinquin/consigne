@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 
-from src.parsers import get_config
+from src.loaders import ConfigLoader
 from src.routes import consigneBp
 from src.middlewares import error_handler, go_fast, log_exit
 from src.listeners import start_redeem_analizer, start_barcode_tracking, initialize_barcode_bases, thread_state_manager
@@ -107,7 +107,8 @@ class Consigne:
             raise ValueError("You must pass your configuration file path as an argument or as Environment Variable: `CONFIG_FILEPATH`.")
         if path is None:
             path = env_path
-        return await cls.initialize_from_configs(**get_config(path))
+        configs = ConfigLoader().load(path)
+        return await cls.initialize_from_configs(**configs)
 
     def print_banner(self) -> None:
         version = Path("./src/VERSION").read_text()
