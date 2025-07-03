@@ -13,7 +13,7 @@ from sqlalchemy import insert
 from typing import Any, Generator
 
 
-from src.parsers import get_config
+from src.loaders import get_config
 from src.odoo import OdooSession
 from src.database import ConsigneDatabase
 
