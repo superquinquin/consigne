@@ -6,6 +6,7 @@ services:
       context: .
     container_name: consigne
     env_file: ./api/.env.dev
+    restart: always
     ports:
       - 127.0.0.1:8000:8000
     volumes:
@@ -36,10 +37,25 @@ services:
       - ./api/database/psql_schema.sql:/home/psql_schema.sql
       - pg_data:/var/lib/postgresql/data/
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready" ]
+      test: [ "CMD-SHELL", "[ -r /var/run/postgresql/ready ] || ( pg_isready && touch /var/run/postgresql/ready)" ]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  front:
+    build:
+      dockerfile: ./front/Dockerfile
+      context: .
+    ports:
+    - 127.0.0.1:8123:8080
+    restart: always
+    entrypoint:
+      [ "http-server", "dist" ]
+    depends_on:
+      db:
+        condition: service_healthy
+      consigne:
+        condition: service_started
 
 volumes:
   pg_data:
