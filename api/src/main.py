@@ -62,6 +62,7 @@ class Consigne:
         app.config.update({k.upper():v for k,v in sanic.get("app", {}).items()})
         if options is not None:
             app.config.update({k.upper():v for k,v in options.items()})
+        app.config.CORS_ORIGINS = "*"
 
         app.blueprint(consigneBp)
         app.on_request(go_fast, priority=100)

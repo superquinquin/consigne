@@ -13,7 +13,7 @@ from sqlalchemy import insert
 from typing import Any, Generator
 
 
-from src.loaders import get_config
+from src.loaders import ConfigLoader
 from src.odoo import OdooSession
 from src.database import ConsigneDatabase
 
@@ -221,7 +221,7 @@ class Builder(object):
 
     @classmethod
     def from_configs(cls, path: str|Path) -> Builder:
-        configs = get_config(path)
+        configs = ConfigLoader().load(path)
         
         odoo_cfg = configs.get("odoo", None)
         database_cfg = configs.get("database", None)
