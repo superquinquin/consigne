@@ -54,9 +54,9 @@ app:
     taxonomy:
       products:
         in_place: False # variation number = variation + in place variations
-        variation_number: 2 # aim to have 10 consigne product records == 10 differents usable barcodes 
+        variation_number: 1 # aim to have 10 consigne product records == 10 differents usable barcodes 
         template:
-          name: Consigne 2
+          name: Consigne
           rule: 999....{NNNDD}
           
       returns:

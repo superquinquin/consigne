@@ -1,4 +1,4 @@
-import type { ApiResponse } from '@/services/api.utils.ts'
+import { API_ADDRESS, type ApiResponse } from '@/services/api.utils.ts'
 
 export type CreateResponse = {
   deposit_id: number
@@ -25,7 +25,7 @@ export type AddProductResponse = {
 }
 export default {
   create: async function (providerCode: number, receiverCode: number): Promise<CreateResponse> {
-    const response = await fetch('http://localhost:8000/deposit/create', {
+    const response = await fetch(`${API_ADDRESS}/deposit/create`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json;charset=UTF-8',
@@ -37,7 +37,7 @@ export default {
   },
 
   getById: async function (depositId: string): Promise<GetByIdResponse> {
-    const response = await fetch(`http://localhost:8000/deposit/${depositId}`, {
+    const response = await fetch(`${API_ADDRESS}/deposit/${depositId}`, {
       method: 'GET',
       headers: { 'content-type': 'application/json;charset=UTF-8' },
     })
@@ -49,7 +49,7 @@ export default {
     depositId: string,
     lineId: string,
   ): Promise<GetByIdAndLineIdResponse> {
-    const response = await fetch(`http://localhost:8000/deposit/${depositId}/${lineId}`, {
+    const response = await fetch(`${API_ADDRESS}/deposit/${depositId}/${lineId}`, {
       method: 'GET',
       headers: { 'content-type': 'application/json;charset=UTF-8' },
     })
@@ -62,7 +62,7 @@ export default {
     productCode: string,
   ): Promise<ApiResponse<AddProductResponse | void>> {
     const response = await fetch(
-      `http://localhost:8000/deposit/${depositId}/return/${productCode}`,
+      `${API_ADDRESS}/deposit/${depositId}/return/${productCode}`,
       {
         method: 'GET',
         headers: { 'content-type': 'application/json;charset=UTF-8' },
@@ -73,7 +73,7 @@ export default {
   },
 
   cancelProduct: async function (depositId: number, lineId: string): Promise<void> {
-    const response = await fetch(`http://localhost:8000/deposit/${depositId}/cancel/${lineId}`, {
+    const response = await fetch(`${API_ADDRESS}/deposit/${depositId}/cancel/${lineId}`, {
       method: 'GET',
       headers: { 'content-type': 'application/json;charset=UTF-8' },
     })
@@ -82,7 +82,7 @@ export default {
   },
 
   printTicket: async function (depositId: number): Promise<void> {
-    const response = await fetch(`http://localhost:8000/deposit/${depositId}/ticket`, {
+    const response = await fetch(`${API_ADDRESS}/deposit/${depositId}/ticket`, {
       method: 'GET',
       headers: { 'content-type': 'application/json;charset=UTF-8' },
     })
@@ -91,7 +91,7 @@ export default {
   },
 
   close: async function (depositId: number): Promise<ApiResponse<void>> {
-    const response = await fetch(`http://localhost:8000/deposit/${depositId}/close`, {
+    const response = await fetch(`${API_ADDRESS}/deposit/${depositId}/close`, {
       method: 'GET',
       headers: { 'content-type': 'application/json;charset=UTF-8' },
     })

@@ -1,4 +1,4 @@
-import type {ApiResponse} from "@/services/api.utils.ts";
+import {type ApiResponse, API_ADDRESS} from "@/services/api.utils.ts";
 
 export type AuthenticateResponse = {
   auth: boolean,
@@ -14,7 +14,7 @@ export type SearchUserResponse = {
 
 export default  {
    authenticate: async (username: string, password: string): Promise<ApiResponse<AuthenticateResponse>> => {
-    const response = await fetch("http://localhost:8000/auth_provider",
+    const response = await fetch(`${API_ADDRESS}/auth_provider`,
       {
         method: 'POST',
         headers: {
@@ -27,7 +27,7 @@ export default  {
   },
 
   searchUser: async (input: string): Promise<ApiResponse<SearchUserResponse>> => {
-    const response = await fetch("http://localhost:8000/search-user",
+    const response = await fetch(`${API_ADDRESS}/search-user`,
       {
         method: 'POST',
         headers: {

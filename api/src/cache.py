@@ -47,7 +47,7 @@ def cached_users(f):
         if cache is None:
             return f(engine, value)
 
-        digest = sha1(value).hexdigest()
+        digest = sha1(value.encode("utf-8")).hexdigest()
         res = cache.get(f"users_{digest}")
         if res is None:
             res = f(engine, value)
