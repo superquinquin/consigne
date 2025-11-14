@@ -25,12 +25,14 @@ export type AddProductResponse = {
 }
 export default {
   create: async function (providerCode: number, receiverCode: number): Promise<CreateResponse> {
+    // For the API, persons receiving returnables are considered as providers
+    // And persons receiving the tickets are considered as receivers
     const response = await fetch(`${API_ADDRESS}/deposit/create`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json;charset=UTF-8',
       },
-      body: JSON.stringify({ receiver_code: receiverCode, provider_code: providerCode }),
+      body: JSON.stringify({ receiver_code: providerCode, provider_code: receiverCode }),
     })
 
     return response.json().then(({ data }: ApiResponse<CreateResponse>) => data)
