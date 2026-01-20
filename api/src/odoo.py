@@ -14,6 +14,8 @@ from typing import Callable, Any
 # pyright: reportFunctionMemberAccess=false
 
 Conditions = list[tuple[str, str, Any]]
+Zone = tuple[datetime | None, datetime | None]
+
 
 FZ_LIMIT = 5
 SHIFT_DT_TOLERANCE = 5
@@ -131,11 +133,15 @@ class OdooSession(ContextDecorator):
         partner = user.partner_id
         return (partner.id, partner.barcode_base, partner.name)
     
-    def get_partner_record_from_code(self, code: int) -> tuple:
-        partner = self.get("res.partner", [("barcode_base", "=", code), ("cooperative_state", "!=", "unsubscribed")])
-        return (partner.id, partner.barcode_base, partner.name)
+    def get_partner_record_from_code(self, code: int) -> list[tuple]:
+        partners = self.browse("res.partner", [("barcode_base", "=", code), ("cooperative_state", "!=", "unsubscribed")])
+        return [(partner.id, partner.barcode_base, partner.name) for partner in partners]
     
-    def fuzzy_user_search(self, value: str) -> list[tuple[int, str]]:
+    def get_partner_record_from_id(self, partner_id: int) -> tuple:
+        partner = self.get("res.partner", [("id", "=", partner_id), ("cooperative_state", "!=", "unsubscribed")])
+        return (partner.id, partner.barcode_base, partner.name)
+
+    def fuzzy_user_search(self, value: str) -> list[tuple[int, int, str]]:
         """return list of users close from the given value. 
         infer method given value type. resulting list size depend on FZ_LIMIT"""
         if value.isnumeric():
@@ -145,16 +151,16 @@ class OdooSession(ContextDecorator):
         return res
 
     @lru_cache(maxsize=32)
-    def fuzzy_code_search(self, user_code: int) -> list[tuple[int, str]]:
+    def fuzzy_code_search(self, user_code: int) -> list[tuple[int, int, str]]:
         res = self.browse("res.partner", [("barcode_base", "like", user_code)])
         print("code", res)
-        return [(r.barcode_base, r.display_name) for r in res[:FZ_LIMIT]]
+        return [(r.id, r.barcode_base, r.display_name) for r in res[:FZ_LIMIT]]
 
     @lru_cache(maxsize=32)
-    def fuzzy_name_search(self, name: int) -> list[tuple[int, str]]:
+    def fuzzy_name_search(self, name: int) -> list[tuple[int, int, str]]:
         res = self.browse("res.partner", [("name", "ilike", name)])
         print("name", res)
-        return [(r.barcode_base, r.display_name) for r in res[:FZ_LIMIT]]
+        return [(r.id, r.barcode_base, r.display_name) for r in res[:FZ_LIMIT]]
 
     def get_current_shift_end_time_dist(self) -> int|None:
         """return dist from current shift end time in seconds"""
@@ -214,16 +220,16 @@ class OdooSession(ContextDecorator):
 
         return (debut, end)
 
-    def get_shifts_members(self, shifts: RecordList) -> list[tuple[int, str]]:
+    def get_shifts_members(self, shifts: RecordList) -> list[tuple[int, int, str]]:
         current_members = []
         for shift in shifts:
             members = self.browse("shift.registration", [("shift_id", "=", shift.id)])
-            current_members.extend([(r.partner_id.barcode_base, r.partner_id.display_name) for r in members])
+            current_members.extend([(r.partner_id.id, r.partner_id.barcode_base, r.partner_id.display_name) for r in members])
 
-        current_members = sorted(current_members, key= lambda x: x[0])
+        current_members = sorted(current_members, key= lambda x: x[1])
         return current_members
     
-    def get_current_shifts_members(self) -> tuple[tuple[datetime | None, datetime | None], list]:
+    def get_current_shifts_members(self) -> tuple[Zone, list[tuple[int, int, str]]]:
         shifts = self.get_current_shifts()
         zone = self.get_shift_zone(shifts)
         if len(shifts) == 0:

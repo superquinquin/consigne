@@ -41,13 +41,13 @@ async def provider_login(request: Request) -> HTTPResponse:
 @consigneBp.route("/deposit/create", methods=["POST"])
 async def initialize_return(request: Request) -> HTTPResponse:
     """Provide a way to generate a new deposit.
-    a `code` is the member account number. odoo model.field: `res.partner.barcode_base`
+    a `id` is the member id. odoo model.field: `res.partner.id`
 
-    For creating a new deposit, it is necessary to provide a receiver_code and a provider_code.
-        where receiver_code is the barcode_base of the person returning the products.
-        where provider_code is the barcode_base of the person providing the returning service.
+    For creating a new deposit, it is necessary to provide a receiver_partner_id and a provider_partner_id.
+        where receiver_partner_id is the partner_id of the person returning the products.
+        where provider_partner_id is the partner_id of the person providing the returning service.
     
-    POST payload: {provider_code: int, receiver_code: int}
+    POST payload: {provider_partner_id: int, receiver_partner_id: int}
 
 
     :return: a json paylaod
@@ -55,13 +55,13 @@ async def initialize_return(request: Request) -> HTTPResponse:
     """
 
     payload = request.load_json()
-    provider_code = payload.get("provider_code", None)
-    receiver_code = payload.get("receiver_code", None)
-    if not all([provider_code, receiver_code]):
-        raise KeyError("Missing `provider_code` or `receiver_code`")
+    provider_partner_id = payload.get("provider_partner_id", None)
+    receiver_partner_id = payload.get("receiver_partner_id", None)
+    if not all([provider_partner_id, receiver_partner_id]):
+        raise KeyError("Missing `provider_partner_id` or `receiver_partner_id`")
 
     engine: ConsigneEngine = request.app.ctx.engine
-    res = engine.initialize_return(receiver_code, provider_code)
+    res = engine.initialize_return(receiver_partner_id, provider_partner_id)
     return json({"status": 200, "reasons": "OK", "data": {"deposit_id": res}})
 
 @consigneBp.route("/deposit/<deposit_id:int>", methods=["GET"])

@@ -137,6 +137,15 @@ class ConsigneDatabase:
             res = session.execute(stmt)
         return self._collect_one_record(res)
 
+    def get_user_from_partner_id(self, partner_id: int) -> dict[str, Any] | None: 
+        with self.session_maker() as session:
+            stmt = (
+                select(Users)
+                .select_from(Users)
+                .where(Users.c.user_partner_id == partner_id)
+            )
+            res = session.execute(stmt)
+        return self._collect_one_record(res)
 
     def get_user_from_id(self, user_id: int) -> dict[str, Any]|None: 
         with self.session_maker() as session:

@@ -52,7 +52,7 @@ class ConsigneEngine(object):
         self.tasks = tasks
         # self.database.load_metadata(__name__)
 
-    def initialize_return(self, receiver_code: int, provider_code: int) -> int:
+    def initialize_return(self, receiver_partner_id: int, provider_partner_id: int) -> int:
         """
         for receiver & provider:
             1. fetch users in db
@@ -61,29 +61,30 @@ class ConsigneEngine(object):
         4. build db reference for the deposit
         Return deposit_id that is need by the front to further operate.
         """
-        if receiver_code == provider_code:
+        if receiver_partner_id == provider_partner_id:
             # FORBID OWN RETURNS
             raise SameUserError()
 
-        user = self.database.get_user_from_code(receiver_code)
+        user = self.database.get_user_from_partner_id(receiver_partner_id)
         if user is None:
             with self.odoo.make_session() as session:
-                receiver = session.get_partner_record_from_code(receiver_code)
+                receiver = session.get_partner_record_from_id(receiver_partner_id)
             res = self.database.add_user(*receiver)
-            receiver_user_id = res.get("user_id")
-            self.database.update_activity(receiver_user_id, "receiver")
+            receiver_user_id = res.get("user_id")    
         else:
             receiver_user_id = user.get("user_id")
+        self.database.update_activity(receiver_user_id, "receiver")
 
-        user = self.database.get_user_from_code(provider_code)
+
+        user = self.database.get_user_from_partner_id(provider_partner_id)
         if user is None:
             with self.odoo.make_session() as session:
-                provider = session.get_partner_record_from_code(provider_code)
+                provider = session.get_partner_record_from_id(provider_partner_id)
             res = self.database.add_user(*provider)
             provider_user_id = res.get("user_id")
-            self.database.update_activity(provider_user_id, "provider")
         else:
             provider_user_id = user.get("user_id")
+        self.database.update_activity(provider_user_id, "provider")
 
         deposit = self.database.add_deposit(receiver_user_id, provider_user_id)
         deposit_id = deposit.get("deposit_id")
@@ -199,17 +200,17 @@ class ConsigneEngine(object):
             )
 
     @cached_shifts
-    def get_shifts_users(self) -> list[tuple[int, str]]:
+    def get_shifts_users(self) -> list[tuple[int, int, str]]:
         """get current shift users. return list of barcodebase, display_name"""
         with self.odoo.make_session() as session:
-            res = session.get_current_shifts_members()
-        return res
+            zone, users = session.get_current_shifts_members()
+        return users
 
     @cached_users
-    def search_user(self, value: str) -> list[tuple[int, str]]:
+    def search_user(self, value: str) -> list[tuple[int, int, str]]:
         """fuzzy search for the user."""
         with self.odoo.make_session() as session:
-            res = session.fuzzy_user_search(value)
+            res = session.fuzzy_user_search(value) # list user(id, code, name)
         return res
 
     def close_deposit(self, deposit_id: int) -> None:
