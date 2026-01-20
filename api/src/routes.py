@@ -111,7 +111,7 @@ async def get_product(request: Request, deposit_id: int, product_barcode: str) -
     return json({"status": 200, "reasons": "OK", "data": res})
 
 @consigneBp.route("/deposit/<deposit_id:int>/cancel/<deposit_line_id:int>", methods=["GET"])
-async def cancel_returned_product(request: Request, deposit_id: int, deposit_line_id: str) -> HTTPResponse:
+async def cancel_returned_product(request: Request, deposit_id: int, deposit_line_id: int) -> HTTPResponse:
     """Cancel a the deposit_line of a returned product.
     the `deposit_id` & `deposit_line_id` path argument combinaison must be valid.
     """

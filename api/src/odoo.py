@@ -6,9 +6,12 @@ from contextlib import ContextDecorator
 from datetime import datetime, timedelta
 from functools import wraps, lru_cache
 from http.client import CannotSendRequest
-from erppeek import Client, Record, RecordList
+from erppeek import Client, Record, RecordList, Model
 
 from typing import Callable, Any
+
+# pyright: reportAttributeAccessIssue=false
+# pyright: reportFunctionMemberAccess=false
 
 Conditions = list[tuple[str, str, Any]]
 
@@ -26,10 +29,11 @@ def resilient(degree: int = 3):
                 try:
                     res = f(*args, **kwargs)
                     success = True
+                    return res
                 except (CannotSendRequest, AssertionError):
                     tries += 1
                     self.renew_session()
-            return res
+            raise ConnectionError("Cannot establish connection with odoo.")
         return wrapper
     return decorator
 
@@ -57,13 +61,13 @@ class OdooConnector(object):
                 client = Client(self.host, verbose=self.verbose)
                 client.login(username, password=password, database=self.database)
                 success = True
+                return OdooSession(client)
             except Exception:
                 time.sleep(retries_interval)
                 tries += 1
-
         if success is False:
             raise ConnectionError("Unable to generate an Odoo Session")
-        return OdooSession(client)
+        
 
 class OdooSession(ContextDecorator):
     client: Client
@@ -78,11 +82,11 @@ class OdooSession(ContextDecorator):
         del self
 
     @resilient(degree=3)
-    def get(self, model: str, conditions: Conditions) -> Record:
+    def get(self, model: str, conditions: Conditions) -> Record | None:
         return self.client.model(model).get(conditions)
 
     @resilient(degree=3)
-    def browse(self, model: str, conditions: Conditions) -> RecordList:
+    def browse(self, model: str, conditions: Conditions) -> Record | RecordList:
         return self.client.model(model).browse(conditions)
 
     def renew_session(self) -> None:
@@ -97,7 +101,7 @@ class OdooSession(ContextDecorator):
     def get_product_from_barcode(self, barcode: str) -> Record:
         return self.get("product.product", [("barcode", "=", barcode)])
 
-    def get_product_return(self, product: Record) -> tuple[bool, Record|None]:
+    def get_product_return(self, product: Record) -> tuple[bool, Record | None]:
         """
         takes a product.product record as argument.
         return a tuple describing both 
@@ -179,28 +183,35 @@ class OdooSession(ContextDecorator):
         return [(str(r.barcode_base), r.barcode, r.name, r.sale_ok) for r in self.browse("product.product", [("product_tmpl_id.categ_id.id", "=", product_cat_id)])]
 
     def get_current_shifts(self) -> RecordList:
-        SHIFT_WINDOW_FLOOR = os.environ.get("SHIFT_WINDOW_FLOOR", 15)
-        SHIFT_WINDOW_CEILING = os.environ.get("SHIFT_WINDOW_CEILING", 15) 
+        SHIFT_WINDOW_FLOOR = int(os.environ.get("SHIFT_WINDOW_FLOOR", 15))
+        SHIFT_WINDOW_CEILING = int(os.environ.get("SHIFT_WINDOW_CEILING", 15))
 
         begin = (datetime.now() - SHIFT_LEN - timedelta(minutes=SHIFT_WINDOW_FLOOR)).isoformat()
         end = (datetime.now() + timedelta(minutes=SHIFT_WINDOW_CEILING)).isoformat()
         shifts = self.browse("shift.shift", [("date_begin_tz", ">=", begin), ("date_begin_tz", "<=", end), ("shift_type_id.id", "=", 1)])
         return shifts
 
-    def get_shift_zone(self, shifts: RecordList) -> tuple[datetime|None, datetime|None]:
-        SHIFT_WINDOW_FLOOR = os.environ.get("SHIFT_WINDOW_FLOOR", 15)
-        SHIFT_WINDOW_CEILING = os.environ.get("SHIFT_WINDOW_CEILING", 15) 
+    def get_shift_zone(self, shifts: RecordList) -> tuple[datetime | None, datetime | None]:
+        SHIFT_WINDOW_FLOOR = int(os.environ.get("SHIFT_WINDOW_FLOOR", 15))
+        SHIFT_WINDOW_CEILING = int(os.environ.get("SHIFT_WINDOW_CEILING", 15) )
         debut, end = None, None
 
         if len(shifts) == 1:
             shift = shifts[0]
-            debut = datetime.fromisoformat(shift.date_begin_tz) + timedelta(minutes=SHIFT_WINDOW_FLOOR)
-            end = datetime.fromisoformat(shift.date_end_tz) - timedelta(minutes=SHIFT_WINDOW_CEILING) 
+            dt_begin = shift.date_begin_tz
+            dt_end = shift.date_end_tz
+            assert isinstance(dt_begin, str) and isinstance(dt_end, str)
+            debut = datetime.fromisoformat(dt_begin) + timedelta(minutes=SHIFT_WINDOW_FLOOR)
+            end = datetime.fromisoformat(dt_end) - timedelta(minutes=SHIFT_WINDOW_CEILING) 
 
         elif len(shifts) == 2:
             first_shift, second_shift = shifts[0], shifts[1]
-            debut = datetime.fromisoformat(second_shift.date_begin_tz) - timedelta(minutes=SHIFT_WINDOW_FLOOR)
-            end = datetime.fromisoformat(first_shift.date_end_tz) + timedelta(minutes=SHIFT_WINDOW_CEILING) 
+            dt_begin = second_shift.date_begin_tz
+            dt_end = first_shift.date_end_tz
+            assert isinstance(dt_begin, str) and isinstance(dt_end, str)
+            debut = datetime.fromisoformat(dt_begin) - timedelta(minutes=SHIFT_WINDOW_FLOOR)
+            end = datetime.fromisoformat(dt_end) + timedelta(minutes=SHIFT_WINDOW_CEILING) 
+
         return (debut, end)
 
     def get_shifts_members(self, shifts: RecordList) -> list[tuple[int, str]]:
@@ -212,7 +223,7 @@ class OdooSession(ContextDecorator):
         current_members = sorted(current_members, key= lambda x: x[0])
         return current_members
     
-    def get_current_shifts_members(self) -> list[tuple[int, str]]:
+    def get_current_shifts_members(self) -> tuple[tuple[datetime | None, datetime | None], list]:
         shifts = self.get_current_shifts()
         zone = self.get_shift_zone(shifts)
         if len(shifts) == 0:

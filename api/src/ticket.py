@@ -5,6 +5,7 @@ from dataclasses import dataclass, field, asdict
 from abc import ABC
 from contextlib import ContextDecorator
 from escpos.printer import Usb, Network
+from escpos.escpos import Escpos
 
 from datetime import datetime
 
@@ -16,6 +17,7 @@ BARCODE RULE EAN13: 999....{NNNDD}
 """
 
 Adapter = Literal["Usb", "Network"]
+
 
 
 @dataclass(frozen=True)
@@ -69,13 +71,13 @@ class ConsignePrinter(object):
     def make_printer_session(self):
         return self._printer(**asdict(self.settings))
 
-class DepositTicket(ABC, ContextDecorator):
+class DepositTicket(ABC, ContextDecorator, Escpos):
     BARCODE_RULE: str = "999....NNNDD"
     RETURN_LINE: str = "{quantity:<3d}X {name:.<20s}: {value:3.1f}€\n"
     TOTAL_LINE: str =  "Total{name:.<20s}: {value:3.1f}€\n"
 
     def __enter__(self):
-        if not all([self.is_usable(), self.is_online()]):
+        if not all([self.is_usable(), self.is_online()]): # pyright: ignore
             raise ValueError("Unable to dialogue with the printer.")
         return self
 
@@ -150,7 +152,11 @@ class Analyzer(object):
     redeem_settings: RedeemAnaliserSettings | None
     behevioral_settings: PurchaseBehaviorSettings | None
 
-    def __init__(self, redeem_settings: RedeemAnaliserSettings, behavioral_settings: PurchaseBehaviorSettings):
+    def __init__(
+        self, 
+        redeem_settings: RedeemAnaliserSettings | None = None, 
+        behavioral_settings: PurchaseBehaviorSettings | None = None
+    ) -> None:
         self.redeem_settings = redeem_settings
         self.behevioral_settings = behavioral_settings
 

@@ -47,14 +47,14 @@ class Pattern(object):
         return bool(re.search(re.compile(self.find), s))
 
     def _escaped(self) -> tuple[str, str]:
-        prefix = "".join([c if c not in ESCAPED else f"\{c}" for c in self.prefix])
-        suffix = "".join([c if c not in ESCAPED else f"\{c}" for c in self.suffix])
+        prefix = "".join([c if c not in ESCAPED else f"\\{c}" for c in self.prefix])
+        suffix = "".join([c if c not in ESCAPED else f"\\{c}" for c in self.suffix])
         return (prefix, suffix)
 
 class ConfigLoader:
     def __init__(
         self, 
-        d: dict[str, Any]=None, 
+        d: dict[str, Any] | None = None, 
         environ_pattern: Pattern = Pattern("${", "}"), 
         template_pattern: Pattern = Pattern("{{", "}}"),
         allow_env_specific_merging: bool=False,
@@ -98,6 +98,8 @@ class ConfigLoader:
             self._merge()
         else:
             self.d = self.d.get(self.main_configs_name)
+
+        assert isinstance(self.d, dict)
         return self.d
 
     def _map(self, d: dict[str, Any], location: list[str]) -> dict[str, Any]:
@@ -135,6 +137,8 @@ class ConfigLoader:
         
     def _merge(self) -> dict[str, Any]:
         env = os.environ.get("ENV", None)
+
+        assert isinstance(self.d, dict)
         main_config = self.d.get(self.main_configs_name, None)
 
         if main_config is None:

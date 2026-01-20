@@ -28,12 +28,16 @@ async def go_fast(request: Request) -> None:
 
 async def log_exit(request: Request, response: HTTPResponse) -> None:
     perf = None # for some unknown reasons perf middleware get skipped for some requests. thus need to check if t is stored.
+    size = None
     if getattr(request.ctx, "t", None) is not None:
         perf = round(perf_counter() - request.ctx.t, 5)
 
+    if response.body is not None:
+        size = len(response.body)
+
     if response.status == 200:
         logger.info(
-            f"{request.host} > {request.method} {request.url} [{request.load_json()}][{str(response.status)}][{str(len(response.body))}b][{perf}s]"
+            f"{request.host} > {request.method} {request.url} [{request.load_json()}][{str(response.status)}][{str(size)}b][{perf}s]"
         )
 
 

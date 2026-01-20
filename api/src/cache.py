@@ -57,7 +57,13 @@ def cached_users(f):
 
 
 class ConsigneCache(HashClient):
-    def __init__(self, servers: list[tuple[str, int]], connect_timeout: int=5, timeout=5, encoding: str="utf-8"):
+    def __init__(
+        self, 
+        servers: list[tuple[str, int]], 
+        connect_timeout: int=5, 
+        timeout=5, 
+        encoding: str="utf-8"
+    ) -> None:
         super().__init__(
             servers, 
             serializer=self.serialize, 
@@ -88,7 +94,7 @@ class ConsigneCache(HashClient):
             return (value.isoformat(), 2)
         return (json.dumps(value), 1)
     
-    def deserialize(self, key: str, value: str, flags: int) -> Any:
+    def deserialize(self, key: str, value: bytes, flags: int) -> Any:
         if flags == 0:
             return value.decode(self.encoding)
         elif flags == 1:
