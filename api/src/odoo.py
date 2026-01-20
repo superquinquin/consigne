@@ -51,7 +51,7 @@ class OdooConnector(object):
         self.database = database
         self.verbose = verbose
 
-    def make_session(self, max_retries: int = 5, retries_interval: int = 5):
+    def make_session(self, max_retries: int = 5, retries_interval: int = 5) -> OdooSession:
         username = os.environ.get("ERP_USERNAME", None)
         password = os.environ.get("ERP_PASSWORD", None)
         if not all([username, password]):
@@ -67,8 +67,7 @@ class OdooConnector(object):
             except Exception:
                 time.sleep(retries_interval)
                 tries += 1
-        if success is False:
-            raise ConnectionError("Unable to generate an Odoo Session")
+        raise ConnectionError("Unable to generate an Odoo Session")
         
 
 class OdooSession(ContextDecorator):
