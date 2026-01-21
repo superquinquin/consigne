@@ -113,7 +113,7 @@ class ConsigneDatabase:
 
     def update_activity(self, user_id: int, activity_as: Literal["provider", "receiver"]) -> None:
         activity_field = f"last_{activity_as}_activity"
-        field = getattr(Users, activity_field, None)
+        field = getattr(Users.c, activity_field, None)
         if field is None:
             raise ValueError("Posible activity_as argument values are: [`provider`, `receiver`]")
 

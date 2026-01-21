@@ -13,7 +13,7 @@ from src.exceptions import (
     OdooError
 )
 
-from src.odoo import OdooConnector
+from src.odoo import OdooConnector, Zone
 from src.database import ConsigneDatabase
 from src.ticket import ConsignePrinter
 from src.cache import ConsigneCache, cached_products, cached_shifts, cached_users
@@ -98,7 +98,7 @@ class ConsigneEngine(object):
         return deposit_id
     
     @cached_products
-    def fetch_product(self, barcode: str) -> tuple[bool, float, tuple, int]:
+    def fetch_product(self, deposit_id: int, barcode: str) -> tuple[bool, float, tuple, int]:
         """search propduct in odoo database"""
         with self.odoo.make_session() as session:
             product = session.get_product_from_barcode(barcode)
@@ -132,7 +132,7 @@ class ConsigneEngine(object):
             * success -> returned product data
             * failed -> Non returnable product message.
         """
-        returnable, return_value,  product_data, return_product_id = self.fetch_product(barcode)
+        returnable, return_value,  product_data, return_product_id = self.fetch_product(deposit_id, barcode)
         # -- SEARCH PRODUCT REFERENCE 
         opid, name, _ = product_data
         db_product = self.database.get_product_from_opid(opid)
@@ -230,11 +230,11 @@ class ConsigneEngine(object):
             )
 
     @cached_shifts
-    def get_shifts_users(self) -> list[tuple[int, int, str]]:
+    def get_shifts_users(self) -> tuple[Zone, list[tuple[int, int, str]]]:
         """get current shift users. return list of barcodebase, display_name"""
         with self.odoo.make_session() as session:
-            zone, users = session.get_current_shifts_members()
-        return users
+            res = session.get_current_shifts_members()
+        return res
 
     @cached_users
     def search_user(self, value: str) -> list[tuple[int, int, str]]:
