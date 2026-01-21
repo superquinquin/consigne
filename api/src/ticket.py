@@ -73,8 +73,8 @@ class ConsignePrinter(object):
 
 class DepositTicket(ABC, ContextDecorator, Escpos):
     BARCODE_RULE: str = "999....NNNDD"
-    RETURN_LINE: str = "{quantity:<3d}X {name:.<20s}: {value:3.1f}€\n"
-    TOTAL_LINE: str =  "Total{name:.<20s}: {value:3.1f}€\n"
+    RETURN_LINE: str = "{quantity:<3d}X {name:.<20s}: {value:3.2f}€\n"
+    TOTAL_LINE: str =  "Total{name:.<20s}: {value:3.2f}€\n"
 
     def __enter__(self):
         if not all([self.is_usable(), self.is_online()]): # pyright: ignore
