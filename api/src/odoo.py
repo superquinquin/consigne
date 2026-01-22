@@ -173,9 +173,9 @@ class OdooSession(ContextDecorator):
             dist = None
         return dist
 
-    def get_redeemed_tickets(self, bases: list[str], before: datetime, after: datetime) -> RecordList:
+    def get_redeemed_tickets(self, bases: list[str], before: datetime, after: datetime) -> list[Record]:
         """research specific barcodes in pos.order_lines before and after certain dates. return matched records"""
-        return self.browse("pos.order.line", [("product_id.barcode_base", "in", bases), ("create_date", "<", before), ("create_date", ">=", after)])
+        return self.browse("pos.order.line", [("product_id.barcode_base", "in", bases), ("create_date", ">=", after), ("create_date", "<", before)])
         
     def pos_order_line_to_record(self, record: Record) -> tuple:
         return (record.order_id.id, record.create_date, record.price_unit, record.product_id.barcode)

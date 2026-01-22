@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import asyncio
-from dataclasses import dataclass, field
 from datetime import datetime
+from dataclasses import dataclass, field
+from pymemcache.client.retrying import RetryingClient
 
 from typing import Any
 
@@ -32,7 +33,7 @@ class ConsigneEngine(object):
     odoo: OdooConnector
     database: ConsigneDatabase
     printer: ConsignePrinter
-    cache: ConsigneCache
+    cache: ConsigneCache | RetryingClient | None
     tasks: dict[str,TaskConfigs]
 
     def __init__(
@@ -40,7 +41,7 @@ class ConsigneEngine(object):
         odoo: OdooConnector, 
         database: ConsigneDatabase, 
         printer: ConsignePrinter,
-        cache: ConsigneCache,
+        cache: ConsigneCache | RetryingClient | None,
         tasks: dict[str, TaskConfigs] | None = None
     ) -> None:
         self.odoo = odoo
@@ -251,9 +252,9 @@ class ConsigneEngine(object):
         TODO: analyzer configuration.
         TODO: define search frequency and span.
         """
+
         before = datetime.now()
         after = self.database.get_last_redeem_datetime() or self.database.get_first_deposit_datetime()
-
         if after is None:
             return
 
@@ -261,27 +262,35 @@ class ConsigneEngine(object):
         with self.odoo.make_session() as session:
             records = session.get_redeemed_tickets(bases, before, datetime.fromisoformat(after))
             for record in records:
-
+                
                 # GET USER & CREATE REFERENCE IF UNKNOWN
-                partner = record.order_id.partner_id
+                partner = record.order_id.partner_id # pyright: ignore
                 partner_db = self.database.get_user_from_code(partner.barcode_base)
                 if partner_db is None:
-                    partner_payload = session.get_partner_record_from_code(partner.barcode)
+                    partner_payload = session.get_partner_record_from_id(partner.id)
                     partner_db = self.database.add_user(*partner_payload) # use user_id for the redeem record
 
-                user_id = partner_db.get("user_id")
+                user_id = partner_db["user_id"]
                 pos_id, dt, value, barcode =  session.pos_order_line_to_record(record)
                 # FIND ALL NON REDEEMED DEPOSITS WITH MATCHING RECEIVER__CODE & DEPOSIT_TOTAL_VALUE
-                deposit = self.database.match_redeem_deposits(barcode, user_id, value)
-                if deposit:
-                    # MATCHING
-                    deposit_id = deposit.get("deposit_id")
-                    redeem = self.database.add_redeem(pos_id, datetime.fromisoformat(dt), user_id, value, barcode, False)
-                    redeem_id = redeem.get("redeem_id")
+                deposits = self.database.match_redeem_deposits(barcode, user_id, value)
+
+                if len(deposits) > 1:
+                    # multiple matches
+                    pos_dt = datetime.fromisoformat(dt)
+                    self.database.add_redeem(pos_id, pos_dt, user_id, value, barcode, True)
+                elif len(deposits) == 1:
+                    # match one 
+                    deposit = deposits[0]
+                    pos_dt = datetime.fromisoformat(dt)
+                    deposit_id = deposit["deposit_id"]
+                    redeem = self.database.add_redeem(pos_id, pos_dt, user_id, value, barcode, False)
+                    redeem_id = redeem["redeem_id"]
                     self.database.update_deposit_redeem(deposit_id, redeem_id)
                 else:
-                    # NO MATCH = ANOMALY
-                    self.database.add_redeem(pos_id, datetime.fromisoformat(dt), user_id, value, barcode, True)
+                    # No matchs
+                    pos_dt = datetime.fromisoformat(dt)
+                    self.database.add_redeem(pos_id, pos_dt, user_id, value, barcode, True)
 
     async def ticket_emissions_analyzer(self) -> None:
         settings = self.tasks.get("analyzer", None)

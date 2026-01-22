@@ -441,7 +441,15 @@ class ConsigneDatabase:
             res = self._collect_all_records(res)
         return res
 
-    def add_redeem(self, order_id: int, dt: str, user_id: int, value: float, barcode: str, anomaly: bool) -> dict[str, Any] | None:
+    def add_redeem(
+        self, 
+        order_id: int, 
+        dt: datetime, 
+        user_id: int, 
+        value: float, 
+        barcode: str, 
+        anomaly: bool
+    ) -> dict[str, Any]:
         with self.session_maker() as session:
             stmt = (
                 insert(Redeem)
@@ -455,14 +463,14 @@ class ConsigneDatabase:
                 )
                 .returning(Redeem.c.redeem_id)                
             )
+            
             res = session.execute(stmt).fetchone()
-            if res is not None:
-                res = res._asdict()
-
+            assert res is not None
+            res = res._asdict()
             session.commit()
         return res
     
-    def _update_consigne_barcodes(self, records: tuple) -> None:
+    def _update_consigne_barcodes(self, records: list[tuple]) -> None:
         with self.session_maker() as session:
             stmt = (
                 select(Consigne.c.consigne_barcode_base)

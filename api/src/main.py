@@ -1,31 +1,25 @@
 from __future__ import annotations
 
-
 import os
 from sanic import Sanic
+from pathlib import Path
 from sanic.log import LOGGING_CONFIG_DEFAULTS
 from pymemcache.client.retrying import RetryingClient
 from pymemcache.exceptions import MemcacheUnexpectedCloseError
 
+from typing import Any
 
-from pathlib import Path
-
-from typing import Any, Literal
-
-
+from src.odoo import OdooConnector
+from src.database import ConsigneDatabase
+from src.cache import ConsigneCache
+from src.engine import ConsigneEngine, TaskConfigs
+from src.ticket import ConsignePrinter
 from src.loaders import ConfigLoader
 from src.routes import consigneBp
 from src.middlewares import error_handler, go_fast, log_exit
 from src.listeners import start_redeem_analizer, start_barcode_tracking, initialize_barcode_bases, thread_state_manager
 
-from src.odoo import OdooConnector
-from src.database import ConsigneDatabase
-from src.ticket import ConsignePrinter, UsbSettings, NetworkSettings
-from src.cache import ConsigneCache
-from src.engine import ConsigneEngine, TaskConfigs
-
-
-StrOrPath = str|Path
+StrOrPath = str | Path
 
 class Consigne:
     """Sanic Consigne app factory"""
@@ -81,7 +75,7 @@ class Consigne:
             cache = RetryingClient(
                 base_cache,
                 attempts=3,
-                retry_delay=0.01,
+                retry_delay=1,
                 retry_for=[MemcacheUnexpectedCloseError],
             )
         else:
@@ -97,17 +91,19 @@ class Consigne:
         app.register_listener(thread_state_manager, "main_process_start")
         app.register_listener(initialize_barcode_bases, "before_server_start")
         app.register_listener(start_barcode_tracking, "before_server_start")
-        app.register_listener(start_redeem_analizer, "before_server_start")
+        # app.register_listener(start_redeem_analizer, "before_server_start")
         return consigne.app
 
     @classmethod
-    async def create_app(cls, path: StrOrPath|None=None) -> Sanic:
+    async def create_app(cls, path: StrOrPath | None = None) -> Sanic:
         """config path either defined as env var or as argument"""
         env_path = os.environ.get("CONFIG_FILEPATH", None)
         if not any([path, env_path]):
             raise ValueError("You must pass your configuration file path as an argument or as Environment Variable: `CONFIG_FILEPATH`.")
         if path is None:
             path = env_path
+        
+        assert path is not None
         configs = ConfigLoader().load(path)
         return await cls.initialize_from_configs(**configs)
 
@@ -128,16 +124,12 @@ class Consigne:
         return logging
 
     @staticmethod
-    def parse_tasks_settings(tasks: dict[str, Any]|None=None) -> dict[str, TaskConfigs]:
+    def parse_tasks_settings(tasks: dict[str, Any] | None = None) -> dict[str, TaskConfigs]:
         if tasks is None:
             return {}
         return {k:TaskConfigs(**v) for k,v in tasks.items()}
     
     @staticmethod
     def reformat_caching_configs(caching: dict[str, Any]) -> dict[str, Any]:
-        caching.update({"servers": [(s["host"], s["port"]) for s in caching.get("servers")]})
+        caching.update({"servers": [(s["host"], s["port"]) for s in caching["servers"]]})
         return caching
-
-
-if __name__ == "__main__":
-    Consigne.create_app("configs.yaml")
