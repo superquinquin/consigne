@@ -96,10 +96,10 @@ const onSubmit = async () => {
       <div
         class="p-2"
         v-for="item in state.searchResult"
-        :key="item.coopNumber"
+        :key="item.partnerId"
         @click="$emit('select-user', item)"
       >
-        <UserCard :user="item" :is-selected="selectedUserId === item.coopNumber.toString()" />
+        <UserCard :user="item" :is-selected="selectedUserId === item.partnerId.toString()" />
       </div>
     </div>
   </div>

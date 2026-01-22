@@ -145,8 +145,8 @@ const onEnd = async () => {
 const createDeposit = async () => {
   if (globalState.provider && globalState.receiver) {
     const result = await depositProvider?.create(
-      globalState.provider.coopNumber,
-      globalState.receiver.coopNumber,
+      globalState.provider.partnerId,
+      globalState.receiver.partnerId,
     )
 
     if (result?.deposit_id) {
@@ -171,7 +171,7 @@ const createDeposit = async () => {
         <SearchUser
           @select-user="selectUser"
           search-label="Sélectionner le coopérateur donnant ses consignes"
-          :selected-user-id="globalState.provider?.coopNumber.toString()"
+          :selected-user-id="globalState.provider?.partnerId.toString()"
         />
         <button @click="createDeposit" type="button">Démarrer le dépôt</button>
       </div>

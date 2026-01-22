@@ -33,12 +33,12 @@ const onSubmit = async () => {
           <SearchUser
             @select-user="selectUser"
             search-label="Sélectionner le coopérateur recevant les consignes"
-            :selected-user-id="globalState.receiver?.coopNumber.toString()"
+            :selected-user-id="globalState.receiver?.partnerId.toString()"
           />
           <ShiftUsers
             class="w-full"
             @select-user="selectUser"
-            :selected-user-id="globalState.receiver?.coopNumber.toString()"
+            :selected-user-id="globalState.receiver?.partnerId.toString()"
           />
 
           <button
