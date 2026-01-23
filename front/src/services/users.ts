@@ -3,34 +3,39 @@ import { API_ADDRESS, type ApiResponse } from '@/services/api.utils.ts'
 /*
  exemple:
  [
-   [
-     1615,
-     "1615 - BAGLIN, Marine"
-   ],
-   [
-     2615,
-     "2615 - Enercoop HDF"
-   ],
-   [
-     615,
-     "615 - CAVAREC, Romain"
-   ],
-   [
-     615,
-     "615 - PEINGNEZ, Sabine, SZEREMETA, Rémi"
-   ]
- ]
+    [
+      1111,
+      1615,
+      "1615 - BAGLIN, Marine"
+    ],
+    [
+      2222,
+      2615,
+      "2615 - Enercoop HDF"
+    ],
+    [
+      3333,
+      615,
+      "615 - CAVAREC, Romain"
+    ],
+    [
+      4444,
+      615,
+      "615 - PEINGNEZ, Sabine, SZEREMETA, Rémi"
+    ]
+  ]
 */
 
 export type SearchUserResponse = {
-  matches: [number, string][]
+  matches: [number, number, string][]
 }
 
 export type GetShiftsUsersResponse = {
-  users: [number, string][]
+  users: [number, number, string][]
 }
 
 export type User = {
+  partnerId: number
   coopNumber: number
   firstName?: string
   lastName?: string
@@ -63,8 +68,8 @@ export default {
     return response.json()
   },
 
-  parseUser: (apiUser: [number, string]): User => {
-    const [coopNumber, nameWithCoopNumber] = apiUser
+  parseUser: (apiUser: [number, number, string]): User => {
+    const [partnerId, coopNumber, nameWithCoopNumber] = apiUser
 
     const deduceFirstAndLastName = (
       name: string,
@@ -84,6 +89,7 @@ export default {
     }
 
     return {
+      partnerId,
       coopNumber,
       ...deduceFirstAndLastName(nameWithCoopNumber),
     }
