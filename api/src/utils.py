@@ -7,8 +7,8 @@ from collections import deque
 def generate_ean(total_value: float, base: str, rule:str = "999....NNNDD") -> str:
     def checksum(ean: str) -> int:
         sum = lambda x, y: int(x) + int(y)
-        evensum = reduce(sum, ean[::2])
-        oddsum = reduce(sum, ean[1::2])
+        evensum = int(reduce(sum, ean[::2]))
+        oddsum = int(reduce(sum, ean[1::2]))
         return (10 - ((evensum + oddsum * 3) % 10)) % 10
     
     INT_SIZE = len(re.findall(r"N", rule))

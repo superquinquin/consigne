@@ -21,3 +21,11 @@ class AlreadyCLosedDepositPrintError(ConsigneException):
 
     def __init__(self) -> None:
         super().__init__(self.message)
+
+class OdooError(ConsigneException):
+    status_code: int = 500
+    internal_error_id: int = 0
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { inject, reactive } from 'vue'
-import UsersProvider, { type User } from '@/services/users.ts'
+import {inject, reactive} from 'vue'
+import UsersProvider, {type User} from '@/services/users.ts'
 import UserCard from '@/components/UserCard.vue'
 
 const usersProvider: typeof UsersProvider | undefined = inject('UsersProvider')
@@ -33,10 +33,10 @@ state.loading = false
       <div
         class="p-2"
         v-for="item in state.shiftUsers"
-        :key="item.coopNumber"
+        :key="item.partnerId"
         @click="$emit('select-user', item)"
       >
-        <UserCard :user="item" :is-selected="selectedUserId === item.coopNumber.toString()" />
+        <UserCard :user="item" :is-selected="selectedUserId === item.partnerId.toString()"/>
       </div>
     </div>
   </div>

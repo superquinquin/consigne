@@ -65,7 +65,7 @@ class ConsigneDatabase:
 
         access = ""
         if all([self.username, self.password, self.host, self.port]):
-            access = f"{self.username}:{self.password}@{self.host}:{int(self.port)}"
+            access = f"{self.username}:{self.password}@{self.host}:{str(self.port)}"
         return f"{engine}://{access}/{self.database}"
 
 
@@ -77,17 +77,20 @@ class ConsigneDatabase:
             capitalized_name = name[0].upper() + name[1:]
             sys.modules[module_name].__dict__.update({capitalized_name:v})            
 
-    def _collect(self, result: Result, fetch: Literal["one", "all"], as_dict: bool=True, serialize: bool=True) -> dict[str, Any]|None:
-        collect: Callable = getattr(Result, f"fetch{fetch}")
-        res = collect(result)
-        if res is None:
-            return None
-        if as_dict and fetch == "all":
-            return [r._asdict() for r in res]
-        if as_dict:
-            return res._asdict()
+
+    def _collect_all_records(self, result: Result) -> list[dict[str, Any]]: 
+        res = result.fetchall()
+        return [r._asdict() for r in res]
+
+    def _collect_one_record(self, result: Result) -> dict[str, Any] | None:
+        res = result.fetchone()
+        if res is not None:
+            res = res._asdict()
         return res
-    
+
+
+
+
     # USERS
     def add_user(self, partner_id: int, code: int, name: str) -> dict[str,Any]:
         with self.session_maker() as session:
@@ -102,13 +105,15 @@ class ConsigneDatabase:
                 )
                 .returning(Users.c.user_id)
             )
-            res = session.execute(stmt).fetchone()._asdict()
+            res = session.execute(stmt).fetchone()
+            assert res is not None
+            res = res._asdict()
             session.commit()
         return res
 
     def update_activity(self, user_id: int, activity_as: Literal["provider", "receiver"]) -> None:
         activity_field = f"last_{activity_as}_activity"
-        field = getattr(Users, activity_field, None)
+        field = getattr(Users.c, activity_field, None)
         if field is None:
             raise ValueError("Posible activity_as argument values are: [`provider`, `receiver`]")
 
@@ -121,7 +126,7 @@ class ConsigneDatabase:
             session.execute(stmt)
             session.commit()
 
-    def get_user_from_code(self, code: int) -> dict[str, Any]|None: 
+    def get_user_from_code(self, code: int) -> dict[str, Any] | None: 
         with self.session_maker() as session:
             stmt = (
                 select(Users)
@@ -129,7 +134,17 @@ class ConsigneDatabase:
                 .where(Users.c.user_code == code)
             )
             res = session.execute(stmt)
-        return self._collect(res, "one")
+        return self._collect_one_record(res)
+
+    def get_user_from_partner_id(self, partner_id: int) -> dict[str, Any] | None: 
+        with self.session_maker() as session:
+            stmt = (
+                select(Users)
+                .select_from(Users)
+                .where(Users.c.user_partner_id == partner_id)
+            )
+            res = session.execute(stmt)
+        return self._collect_one_record(res)
 
     def get_user_from_id(self, user_id: int) -> dict[str, Any]|None: 
         with self.session_maker() as session:
@@ -139,7 +154,7 @@ class ConsigneDatabase:
                 .where(Users.c.user_id == user_id)
             )
             res = session.execute(stmt)
-        return self._collect(res, "one")
+        return self._collect_one_record(res)
 
     # PRODUCTS
     def add_product(self, opid: int, name: str, barcode: str, return_product_id: int) -> dict[str, Any]:
@@ -153,7 +168,10 @@ class ConsigneDatabase:
                     product_return_id=return_product_id
                 )
                 .returning(Products.c.product_id))
-            res = session.execute(stmt).fetchone()._asdict()
+            res = session.execute(stmt).fetchone()
+            assert res is not None
+            res = res._asdict()
+
             session.commit()
         return res
 
@@ -169,7 +187,10 @@ class ConsigneDatabase:
                 )
                 .returning(Product_returns.c.product_return_id)
             )
-            res = session.execute(stmt).fetchone()._asdict()
+            res = session.execute(stmt).fetchone()
+            assert res is not None
+            res = res._asdict()
+
             session.commit()
         return res
 
@@ -195,23 +216,23 @@ class ConsigneDatabase:
             session.execute(stmt)
             session.commit()
 
-    def get_product_from_opid(self, opid: int) -> dict[str, Any]: 
+    def get_product_from_opid(self, opid: int) -> dict[str, Any] | None: 
         with self.session_maker() as session:
             stmt = (
                 select(Products)
                 .where(Products.c.odoo_product_id == opid)
             )
             res = session.execute(stmt)
-        return self._collect(res, "one")
+        return self._collect_one_record(res)
 
-    def get_return_product_from_opid(self, opid: int) -> dict[str, Any]: 
+    def get_return_product_from_opid(self, opid: int) -> dict[str, Any] | None: 
         with self.session_maker() as session:
             stmt = (
                 select(Product_returns)
                 .where(Product_returns.c.odoo_product_return_id == opid)
             )
             res = session.execute(stmt)
-        return self._collect(res, "one")
+        return self._collect_one_record(res)
 
     # DEPOSITS
     def add_deposit(self, receiver_id: int, provider_id: int) -> dict[str,Any]:
@@ -228,7 +249,10 @@ class ConsigneDatabase:
                 )
                 .returning(Deposits.c.deposit_id)
             )
-            res = session.execute(stmt).fetchone()._asdict()
+            res = session.execute(stmt).fetchone()
+            assert res is not None
+            res = res._asdict()
+
             session.commit()
         return res
 
@@ -255,7 +279,10 @@ class ConsigneDatabase:
                 )
                 .returning(Deposit_lines.c.deposit_line_id)
             )
-            res = session.execute(stmt).fetchone()._asdict()
+            res = session.execute(stmt).fetchone()
+            assert res is not None
+            res = res._asdict()
+
             session.commit()
         return res
 
@@ -272,25 +299,29 @@ class ConsigneDatabase:
 
 
     # GLOBAL
-    def get_first_deposit_datetime(self) -> str|None:
+    def get_first_deposit_datetime(self) -> str | None:
         with self.session_maker() as session:
             stmt = (
                 select(Deposits)
                 .where(Deposits.c.deposit_id == 1)
             )
-            deposit = self._collect(session.execute(stmt), "one")
+
+            res = session.execute(stmt)
+            deposit = self._collect_one_record(res)
             if deposit is None:
                 return
             return deposit.get("deposit_datetime")
 
-    def get_last_redeem_datetime(self) -> str|None:
+    def get_last_redeem_datetime(self) -> str | None:
         with self.session_maker() as session:
             stmt = (
                 select(Redeem)
                 .order_by(Redeem.c.redeem_id.desc())
                 .limit(1)
             )
-            redeem = self._collect(session.execute(stmt), "one")
+
+            res = session.execute(stmt)
+            redeem = self._collect_one_record(res)
             if redeem is None:
                 return
             return redeem.get("redeem_datetime")
@@ -301,19 +332,22 @@ class ConsigneDatabase:
                 select(Consigne.c.consigne_barcode_base)
                 .select_from(Consigne)
             )
-            redeem = self._collect(session.execute(stmt), "all")
-        return [r.get("consigne_barcode_base") for r in redeem]
 
+            res = session.execute(stmt)
+            records = self._collect_all_records(res)
+        bases = list(filter(None, [r.get("consigne_barcode_base") for r in records]))
+        return bases
 
-    def get_deposit_data(self, deposit_id: int) -> dict[str,Any]|None:
+    def get_deposit_data(self, deposit_id: int) -> dict[str,Any] | None:
         with self.session_maker() as session:
             stmt = (
                 select(Deposits)
                 .where(Deposits.c.deposit_id == deposit_id)
             )
 
-            deposit = self._collect(session.execute(stmt), "one")
 
+            res = session.execute(stmt)
+            deposit = self._collect_one_record(res)
             if deposit is None:
                 return deposit
             
@@ -329,8 +363,8 @@ class ConsigneDatabase:
                 .where(Users.c.user_id == provider_id)
             )
 
-            receiver = self._collect(session.execute(reciever_stmt),"one")
-            provider = self._collect(session.execute(provider_stmt),"one")
+            receiver = self._collect_one_record(session.execute(reciever_stmt))
+            provider = self._collect_one_record(session.execute(provider_stmt))
 
             stmt = (    
                 select(Deposit_lines, Products, Product_returns)
@@ -339,8 +373,9 @@ class ConsigneDatabase:
                 .join(Product_returns)
                 .where(Deposit_lines.c.deposit_id == deposit_id)
             )
-            deposit_lines = self._collect(session.execute(stmt), "all")
 
+            res = session.execute(stmt)
+            deposit_lines = self._collect_all_records(res)
         return {
             "deposit": deposit,
             "provider": provider,
@@ -349,7 +384,7 @@ class ConsigneDatabase:
         }
 
 
-    def get_deposit_line_data(self, deposit_id: int, deposit_line_id: int) -> dict[str, Any]:
+    def get_deposit_line_data(self, deposit_id: int, deposit_line_id: int) -> dict[str, Any] | None:
         with self.session_maker() as session:
             stmt = (
                 select(Deposit_lines)
@@ -359,7 +394,7 @@ class ConsigneDatabase:
                 .where(Deposit_lines.c.deposit_line_id == deposit_line_id)
             )
             res = session.execute(stmt)
-        return self._collect(res, "one")
+        return self._collect_one_record(res)
 
     def get_returns_per_types(self, deposit_id) -> list[tuple[str, int, float]]:
         RETURNS_PER_PRODUCT_TYPE = """\
@@ -379,10 +414,11 @@ class ConsigneDatabase:
 
         with self.session_maker() as session:
             res = session.execute(text(RETURNS_PER_PRODUCT_TYPE), {'did':deposit_id}).fetchall()
-        return res
+        types = [(pr, c, s) for pr,c,s in list(res)]
+        return types
 
     # REDEEM
-    def match_redeem_deposits(self, barcode: str, partner_id: int, value: float) -> dict[str, Any] | None: 
+    def match_redeem_deposits(self, barcode: str, partner_id: int, value: float) -> list[dict[str, Any]]: 
         POS_REDEEM_MATCHING = """\
             SELECT 
                 deposits.deposit_id
@@ -401,10 +437,19 @@ class ConsigneDatabase:
             ORDER BY deposit_id;
             """
         with self.session_maker() as session:
-            res = session.execute(text(POS_REDEEM_MATCHING), {'pid':partner_id, "barcode": barcode, "value": value}).fetchall()
+            res = session.execute(text(POS_REDEEM_MATCHING), {'pid':partner_id, "barcode": barcode, "value": value})
+            res = self._collect_all_records(res)
         return res
 
-    def add_redeem(self, order_id: int, dt: str, user_id: int, value: float, barcode: str, anomaly: bool) -> dict[str, Any]:
+    def add_redeem(
+        self, 
+        order_id: int, 
+        dt: datetime, 
+        user_id: int, 
+        value: float, 
+        barcode: str, 
+        anomaly: bool
+    ) -> dict[str, Any]:
         with self.session_maker() as session:
             stmt = (
                 insert(Redeem)
@@ -418,11 +463,14 @@ class ConsigneDatabase:
                 )
                 .returning(Redeem.c.redeem_id)                
             )
-            res = session.execute(stmt).fetchone()._asdict()
+            
+            res = session.execute(stmt).fetchone()
+            assert res is not None
+            res = res._asdict()
             session.commit()
         return res
     
-    def _update_consigne_barcodes(self, records: tuple) -> None:
+    def _update_consigne_barcodes(self, records: list[tuple]) -> None:
         with self.session_maker() as session:
             stmt = (
                 select(Consigne.c.consigne_barcode_base)
@@ -450,15 +498,13 @@ class ConsigneDatabase:
                     session.execute(stmt)
             session.commit()
 
-
-    def next_barcode_base(self) -> tuple[int, str]:
+    def next_barcode_base(self) -> tuple[int, str | None]:
         with self.session_maker() as session:
             stmt = (
                 select(Deposits.c.deposit_barcode_base_id)
                 .where(Deposits.c.deposit_barcode_base_id != None)
                 .order_by(Deposits.c.deposit_id.desc())
                 .limit(1)
-                
             )
             res = session.execute(stmt).fetchone() or (0,)
             consigne_id = res[0]
@@ -474,14 +520,15 @@ class ConsigneDatabase:
         return (base_id, base)
         
 
-    def _get_base(self, consigne_id: int) -> int|None:
+    def _get_base(self, consigne_id: int) -> str | None:
         with self.session_maker() as session:
             stmt = (
                 select(Consigne.c.consigne_barcode_base)
                 .select_from(Consigne)
                 .where(Consigne.c.consigne_id == consigne_id)
             )
-            res = session.execute(stmt).fetchone()
-        if res:
+
+        res = session.execute(stmt).fetchone()
+        if res is not None:
             return res[0]
-        return res
+        return

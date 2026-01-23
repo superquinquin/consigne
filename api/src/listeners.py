@@ -5,10 +5,8 @@ import multiprocessing
 import logging
 import time
 
-from src.engine import ConsigneEngine, TaskConfigs
-from src.odoo import OdooConnector
-from src.database import ConsigneDatabase
-from src.ticket import ConsignePrinter, UsbSettings, NetworkSettings
+from src.engine import ConsigneEngine
+
 
 tasks_logger = logging.getLogger("tasks")
 
@@ -20,7 +18,7 @@ async def start_redeem_analizer(app: Sanic):
     
     if app.shared_ctx.analyzer.qsize() == 0:
         app.shared_ctx.analyzer.put(1)
-        app.add_task(engine.ticket_emissions_analyzer)
+        app.add_task(engine.ticket_emissions_analyzer) # pyright: ignore
         
 async def start_barcode_tracking(app: Sanic):
     engine: ConsigneEngine = app.ctx.engine
@@ -31,7 +29,7 @@ async def start_barcode_tracking(app: Sanic):
 
     if app.shared_ctx.tracker.qsize() == 0:
         app.shared_ctx.tracker.put(1)
-        app.add_task(engine.bases_tracker_runner)
+        app.add_task(engine.bases_tracker_runner) # pyright: ignore
 
 async def initialize_barcode_bases(app:Sanic):
     engine: ConsigneEngine = app.ctx.engine
