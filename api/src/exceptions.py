@@ -4,12 +4,10 @@ from sanic import SanicException
 class ConsigneException(SanicException):
     ...
 
-
-
 class SameUserError(ConsigneException):
     status_code: int = 500
     internal_error_id: int = 0
-    message: str = "A Provider user is not allowed to do it's own returns."
+    message: str = "Une personne ne peux pas faire ses propres retour de consignes"
 
     def __init__(self) -> None:
         super().__init__(self.message)
@@ -17,15 +15,30 @@ class SameUserError(ConsigneException):
 class AlreadyCLosedDepositPrintError(ConsigneException):
     status_code: int = 500
     internal_error_id: int = 1
-    message: str = "This deposit is closed. Ticket printer is blocked"
+    message: str = "Ce dépot de consigne à déjà été clos."
 
     def __init__(self) -> None:
         super().__init__(self.message)
 
 class OdooError(ConsigneException):
     status_code: int = 500
-    internal_error_id: int = 0
+    internal_error_id: int = 2
 
     def __init__(self, message: str) -> None:
         super().__init__(message)
 
+class ProductNotFound(ConsigneException):
+    status_code: int = 500
+    internal_error_id: int = 3
+    message: str = "Le produit scanné n'existe pas: {barcode}"
+
+    def __init__(self, barcode: str) -> None:
+        super().__init__(self.message.format(barcode=barcode))
+
+class CoopNotFound(ConsigneException):
+    status_code: int = 500
+    internal_error_id: int = 4
+    message: str = "Coopérateur inexistant ou désinscrit."
+
+    def __init__(self) -> None:
+        super().__init__(self.message)

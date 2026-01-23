@@ -11,7 +11,9 @@ from typing import Any
 from src.exceptions import (
     SameUserError,
     AlreadyCLosedDepositPrintError,
-    OdooError
+    OdooError,
+    ProductNotFound,
+    CoopNotFound
 )
 
 from src.odoo import OdooConnector, Zone
@@ -26,7 +28,6 @@ tasks_logger = logging.getLogger("tasks")
 class TaskConfigs:
     pooling: bool = field(default=False)
     frequency: int =  field(default=600)
-
 
 
 class ConsigneEngine(object):
@@ -68,29 +69,11 @@ class ConsigneEngine(object):
             raise SameUserError()
 
         # search receiver user
-        user = self.database.get_user_from_partner_id(receiver_partner_id)
-        if user is None:
-            # create user when None
-            with self.odoo.make_session() as session:
-                receiver = session.get_partner_record_from_id(receiver_partner_id)
-            res = self.database.add_user(*receiver)
-            receiver_user_id = res.get("user_id", None)  
-        else:
-            receiver_user_id = user.get("user_id", None)
-        assert receiver_user_id is not None
+        receiver_user_id = self._get_or_set_user(receiver_partner_id)
         self.database.update_activity(receiver_user_id, "receiver")
 
         # search provider user
-        user = self.database.get_user_from_partner_id(provider_partner_id)
-        if user is None:
-            # create user when None
-            with self.odoo.make_session() as session:
-                provider = session.get_partner_record_from_id(provider_partner_id)
-            res = self.database.add_user(*provider)
-            provider_user_id = res.get("user_id", None)
-        else:
-            provider_user_id = user.get("user_id", None)
-        assert provider_user_id is not None
+        provider_user_id = self._get_or_set_user(provider_partner_id)
         self.database.update_activity(provider_user_id, "provider")
 
         deposit = self.database.add_deposit(receiver_user_id, provider_user_id)
@@ -103,6 +86,9 @@ class ConsigneEngine(object):
         """search propduct in odoo database"""
         with self.odoo.make_session() as session:
             product = session.get_product_from_barcode(barcode)
+            if product is None:
+                raise ProductNotFound(barcode)
+            
             product_data = session.product_to_record(product)
             returnable, return_product = session.get_product_return(product)
 
@@ -279,6 +265,7 @@ class ConsigneEngine(object):
                     # multiple matches
                     pos_dt = datetime.fromisoformat(dt)
                     self.database.add_redeem(pos_id, pos_dt, user_id, value, barcode, True)
+
                 elif len(deposits) == 1:
                     # match one 
                     deposit = deposits[0]
@@ -318,3 +305,18 @@ class ConsigneEngine(object):
         with self.odoo.make_session() as session:
             existing = session.get_existing_consigne_barcodes()
         self.database._update_consigne_barcodes(existing)
+
+    def _get_or_set_user(self, partner_id: int) -> int:
+        user = self.database.get_user_from_partner_id(partner_id)
+        if user is None:
+            # create user when None
+            with self.odoo.make_session() as session:
+                user = session.get_partner_record_from_id(partner_id)
+            if user is None:
+                raise CoopNotFound()
+            res = self.database.add_user(*user)
+            user_id = res.get("user_id", None)  
+        else:
+            user_id = user.get("user_id", None)
+        assert user_id is not None
+        return user_id
