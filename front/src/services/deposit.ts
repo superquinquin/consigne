@@ -32,7 +32,7 @@ export default {
       headers: {
         'content-type': 'application/json;charset=UTF-8',
       },
-      body: JSON.stringify({ receiver_code: providerCode, provider_code: receiverCode }),
+      body: JSON.stringify({ receiver_partner_id: providerCode, provider_partner_id: receiverCode }),
     })
 
     return response.json().then(({ data }: ApiResponse<CreateResponse>) => data)
