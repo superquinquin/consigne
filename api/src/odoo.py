@@ -17,7 +17,7 @@ Conditions = list[tuple[str, str, Any]]
 Zone = tuple[datetime | None, datetime | None]
 
 
-FZ_LIMIT = 5
+FZ_LIMIT = 10
 SHIFT_DT_TOLERANCE = 5
 SHIFT_LEN = timedelta(hours=2, minutes=45)
 
@@ -99,7 +99,7 @@ class OdooSession(ContextDecorator):
         client.login(username, password=password, database=self.client._db)
         self.client = client
 
-    def get_product_from_barcode(self, barcode: str) -> Record:
+    def get_product_from_barcode(self, barcode: str) -> Record | None:
         return self.get("product.product", [("barcode", "=", barcode)])
 
     def get_product_return(self, product: Record) -> tuple[bool, Record | None]:
@@ -136,7 +136,7 @@ class OdooSession(ContextDecorator):
         partners = self.browse("res.partner", [("barcode_base", "=", code), ("cooperative_state", "!=", "unsubscribed")])
         return [(partner.id, partner.barcode_base, partner.name) for partner in partners]
     
-    def get_partner_record_from_id(self, partner_id: int) -> tuple:
+    def get_partner_record_from_id(self, partner_id: int) -> tuple | None:
         partner = self.get("res.partner", [("id", "=", partner_id), ("cooperative_state", "!=", "unsubscribed")])
         return (partner.id, partner.barcode_base, partner.name)
 
@@ -144,21 +144,20 @@ class OdooSession(ContextDecorator):
         """return list of users close from the given value. 
         infer method given value type. resulting list size depend on FZ_LIMIT"""
         if value.isnumeric():
-            res = self.fuzzy_code_search(value)
+            res = self.fuzzy_code_search(int(value))
         else:
             res = self.fuzzy_name_search(value)
         return res
 
-    @lru_cache(maxsize=32)
+    # @lru_cache(maxsize=32)
     def fuzzy_code_search(self, user_code: int) -> list[tuple[int, int, str]]:
-        res = self.browse("res.partner", [("barcode_base", "like", user_code)])
-        print("code", res)
-        return [(r.id, r.barcode_base, r.display_name) for r in res[:FZ_LIMIT]]
+        """have to be a browse because barcode_base is not unique, but op can be ="""
+        res = self.browse("res.partner", [("barcode_base", "=", user_code), ("cooperative_state", "!=", "unsubscribed")])
+        return [(r.id, r.barcode_base, r.display_name) for r in res]
 
-    @lru_cache(maxsize=32)
-    def fuzzy_name_search(self, name: int) -> list[tuple[int, int, str]]:
-        res = self.browse("res.partner", [("name", "ilike", name)])
-        print("name", res)
+    # @lru_cache(maxsize=32)
+    def fuzzy_name_search(self, name: str) -> list[tuple[int, int, str]]:
+        res = self.browse("res.partner", [("name", "ilike", name), ("cooperative_state", "!=", "unsubscribed")])
         return [(r.id, r.barcode_base, r.display_name) for r in res[:FZ_LIMIT]]
 
     def get_current_shift_end_time_dist(self) -> int|None:
