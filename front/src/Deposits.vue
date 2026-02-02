@@ -159,17 +159,12 @@ const createDeposit = async () => {
   <div class="hidden py-4 text-black">Global state : {{ JSON.stringify(globalState) }}</div>
   <div class="hidden py-4 text-black">Deposit state : {{ JSON.stringify(depositState) }}</div>
   <main class="w-full h-full">
-    <div class="text-black">
-      Afin de tester, essayez les codes barres suivant : 3770000661170, 5411087001562,
-      3361730666667, 3770000661071
-    </div>
-    <br/>
     <template v-if="!globalState.depositId">
       <div class="flex flex-col gap-2 px-auto">
         <SearchUser
           @select-user="selectUser"
           @confirm-user="createDeposit"
-          search-label="Sélectionner le coopérateur donnant ses consignes"
+          search-label="Identifier le membre qui rapporte des bouteilles"
           :selected-user-id="globalState.provider?.partnerId.toString()"
         />
         <button @click="createDeposit" type="button">Démarrer le dépôt</button>
@@ -265,7 +260,7 @@ const createDeposit = async () => {
 
         <div class="flex flex-row gap-8">
           <button @click="onPrint" type="button">
-            <span v-if="!depositState.printTicketLoading">Imprimer le ticket</span>
+            <span v-if="!depositState.printTicketLoading">Imprimer le reçu</span>
             <svg
               v-else
               aria-hidden="true"
@@ -286,7 +281,7 @@ const createDeposit = async () => {
             </svg>
           </button>
           <button @click="onEnd" type="button">
-            <span v-if="!depositState.closeDepositLoading">Mettre fin au dépôt</span>
+            <span v-if="!depositState.closeDepositLoading">Annuler et retourner à l'accueil</span>
             <svg
               v-else
               class="animate-spin h-5 w-5"

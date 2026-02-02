@@ -32,7 +32,7 @@ const onSubmit = async () => {
 
 <template>
   <div class="flex flex-col gap-8">
-    <div class="flex flex-col w-1/3 gap-2">
+    <div class="flex flex-col gap-2">
       <label class="text-2xl text-black font-bold">{{
         searchLabel ? searchLabel : 'Rechercher un utilisateur'
       }}</label>
