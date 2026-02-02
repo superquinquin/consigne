@@ -95,8 +95,6 @@ const onSubmit = async (event?: KeyboardEvent) => {
     depositState.addProductLoading = true
     const returnable = await queryForReturnable(depositState.barcode)
 
-    console.log(returnable)
-
     if (returnable?.isReturnable) {
       depositState.returnGoods = [...depositState.returnGoods, returnable]
     } else {
@@ -202,6 +200,7 @@ const createDeposit = async () => {
             <input
               v-model="depositState.barcode"
               v-on:keyup.enter="onSubmit"
+              :disabled="depositState.addProductLoading"
               class="block w-full p-3 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white focus:ring-blue-500 focus:border-blue-500 outline-none transition duration-150 ease-in-out"
               placeholder="Scannez un produit"
               autocomplete="off"
