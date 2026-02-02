@@ -170,6 +170,7 @@ const createDeposit = async () => {
       <div class="flex flex-col gap-2 px-auto">
         <SearchUser
           @select-user="selectUser"
+          @confirm-user="createDeposit"
           search-label="Sélectionner le coopérateur donnant ses consignes"
           :selected-user-id="globalState.provider?.partnerId.toString()"
         />
