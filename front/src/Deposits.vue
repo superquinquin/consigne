@@ -241,13 +241,17 @@ const createDeposit = async () => {
           </div>
         </div>
 
-        <div v-if="errorState.productName" class="text-xl text-red-500">
-          {{ errorState.productName }} n'est pas consigné !
+        <div v-if="errorState.productName" class="text-2xl font-semibold text-red-500">
+          ⚠️ {{ errorState.productName }} n'est pas consigné !<br/>
+          Cette bouteille n'est pas reprise.<br/>
+          Merci de reprendre votre bouteille et de la déposer dans une benne dédiée au recyclage du verre
         </div>
 
-        <div v-if="errorState.reasons" class="text-xl text-red-500">
-          Une erreur semble avoir apparut :
-          {{ errorState.reasons }}
+        <div v-if="errorState.reasons" class="text-2xl font-semibold text-red-500">
+          ⚠️ Une erreur est apparue : <br/>
+          {{ errorState.reasons }} <br/>
+          Si le code-barre est correct, ce produit n'est pas vendu par SuperQuinquin. <br/>
+          Le produit n'est pas repris.
         </div>
 
         <div class="flex flex-col gap-4" v-if="depositState.returnGoods.length !== 0">
@@ -326,7 +330,7 @@ const createDeposit = async () => {
                 Oui
               </button>
               <button class="bg-red" @click="cancel" type="button">
-                Continuer a modifier le dépôt
+                Continuer à modifier le dépôt
               </button>
             </div>
           </div>
