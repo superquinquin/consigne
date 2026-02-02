@@ -66,4 +66,11 @@ button {
 button:hover {
   background-color: var(--color-green-300);
 }
+
+.modal {
+  button {
+    border-color: var(--color-gray-300);
+    border-width: 1px;
+  }
+}
 </style>

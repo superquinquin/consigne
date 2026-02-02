@@ -5,10 +5,19 @@ import SearchUser from '@/components/SearchUser.vue'
 import type {User} from './services/users'
 import {getGlobalState, setGlobalState} from "@/services/state.ts";
 import {useRouter} from "vue-router";
+import {useConfirmDialog} from '@vueuse/core';
+
 
 const globalState = getGlobalState()
 const depositProvider: typeof Deposit | undefined = inject('DepositProvider')
 const router = useRouter()
+const {isRevealed, reveal, confirm, cancel, onConfirm}
+  = useConfirmDialog()
+
+onConfirm(async () => {
+  await onPrint()
+  await onEnd()
+})
 
 watch(() => globalState.receiver, async (receiver) => {
   if (!receiver) {
@@ -259,7 +268,7 @@ const createDeposit = async () => {
         </div>
 
         <div class="flex flex-row gap-8">
-          <button @click="onPrint" type="button">
+          <button @click="reveal" type="button">
             <span v-if="!depositState.printTicketLoading">Imprimer le reçu</span>
             <svg
               v-else
@@ -306,6 +315,23 @@ const createDeposit = async () => {
           </button>
         </div>
       </div>
+
+      <teleport to="body">
+        <div v-if="isRevealed" class="modal-bg">
+          <div class="modal rounded-xl">
+            <h2 class="text-xl text-black p-10">Êtes vous sûr de vouloir imprimer le reçu et clôturer le
+              dépôt ?</h2>
+            <div class="flex flex-row gap-4 justify-center">
+              <button class="bg-black" @click="confirm" type="button">
+                Oui
+              </button>
+              <button class="bg-red" @click="cancel" type="button">
+                Continuer a modifier le dépôt
+              </button>
+            </div>
+          </div>
+        </div>
+      </teleport>
     </template>
   </main>
 </template>
@@ -319,6 +345,25 @@ header {
   display: block;
   margin: 0 auto 2rem;
 }
+
+.modal-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background-color: rgba(0, 0, 0, .5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal {
+  position: relative;
+  background-color: white;
+  padding: 2em 1em;
+}
+
 
 @media (min-width: 1024px) {
   header {
