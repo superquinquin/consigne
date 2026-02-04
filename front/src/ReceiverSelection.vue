@@ -32,12 +32,14 @@ const onSubmit = async () => {
         <div class="flex flex-col gap-8">
           <SearchUser
             @select-user="selectUser"
+            @confirm-user="onSubmit"
             search-label="Sélectionner le coopérateur recevant les consignes"
             :selected-user-id="globalState.receiver?.partnerId.toString()"
           />
           <ShiftUsers
             class="w-full"
             @select-user="selectUser"
+            @confirm-user="onSubmit"
             :selected-user-id="globalState.receiver?.partnerId.toString()"
           />
 

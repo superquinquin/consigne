@@ -35,6 +35,7 @@ state.loading = false
         v-for="item in state.shiftUsers"
         :key="item.partnerId"
         @click="$emit('select-user', item)"
+        @dblclick="$emit('confirm-user',item)"
       >
         <UserCard :user="item" :is-selected="selectedUserId === item.partnerId.toString()"/>
       </div>

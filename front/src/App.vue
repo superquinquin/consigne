@@ -16,7 +16,7 @@ const resetCoop = () => {
     <div class="flex flex-col">
       <h1 class="text-black text-4xl">Retournez vos bouteilles ! 🔄</h1>
       <span v-if="!!globalState.receiver" class="text-black text-xl"
-        >Coopérateur en charge :
+        >Coopérateur en service à l'accueil :
         {{
           globalState.receiver?.firstName && globalState.receiver?.lastName
             ? globalState.receiver?.firstName + ' ' + globalState.receiver?.lastName
@@ -31,7 +31,7 @@ const resetCoop = () => {
             : globalState.provider?.fullName
         }}
       </span>
-      <button v-if="!!globalState.receiver || !!globalState.provider" class="" type="button" @click="resetCoop()">Changer les coopérateurs</button>
+      <button v-if="!!globalState.receiver || !!globalState.provider" class="" type="button" @click="resetCoop()">Changer le membre en service</button>
     </div>
     <img
       alt="Vue logo"
@@ -65,5 +65,12 @@ button {
 
 button:hover {
   background-color: var(--color-green-300);
+}
+
+.modal {
+  button {
+    border-color: var(--color-gray-300);
+    border-width: 1px;
+  }
 }
 </style>

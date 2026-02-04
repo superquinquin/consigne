@@ -5,10 +5,19 @@ import SearchUser from '@/components/SearchUser.vue'
 import type {User} from './services/users'
 import {getGlobalState, setGlobalState} from "@/services/state.ts";
 import {useRouter} from "vue-router";
+import {useConfirmDialog} from '@vueuse/core';
+
 
 const globalState = getGlobalState()
 const depositProvider: typeof Deposit | undefined = inject('DepositProvider')
 const router = useRouter()
+const {isRevealed, reveal, confirm, cancel, onConfirm}
+  = useConfirmDialog()
+
+onConfirm(async () => {
+  await onPrint()
+  await onEnd()
+})
 
 watch(() => globalState.receiver, async (receiver) => {
   if (!receiver) {
@@ -95,8 +104,6 @@ const onSubmit = async (event?: KeyboardEvent) => {
     depositState.addProductLoading = true
     const returnable = await queryForReturnable(depositState.barcode)
 
-    console.log(returnable)
-
     if (returnable?.isReturnable) {
       depositState.returnGoods = [...depositState.returnGoods, returnable]
     } else {
@@ -161,16 +168,12 @@ const createDeposit = async () => {
   <div class="hidden py-4 text-black">Global state : {{ JSON.stringify(globalState) }}</div>
   <div class="hidden py-4 text-black">Deposit state : {{ JSON.stringify(depositState) }}</div>
   <main class="w-full h-full">
-    <div class="text-black">
-      Afin de tester, essayez les codes barres suivant : 3770000661170, 5411087001562,
-      3361730666667, 3770000661071
-    </div>
-    <br/>
     <template v-if="!globalState.depositId">
       <div class="flex flex-col gap-2 px-auto">
         <SearchUser
           @select-user="selectUser"
-          search-label="Sélectionner le coopérateur donnant ses consignes"
+          @confirm-user="createDeposit"
+          search-label="Identifier le membre qui rapporte des bouteilles"
           :selected-user-id="globalState.provider?.partnerId.toString()"
         />
         <button @click="createDeposit" type="button">Démarrer le dépôt</button>
@@ -201,6 +204,7 @@ const createDeposit = async () => {
             <input
               v-model="depositState.barcode"
               v-on:keyup.enter="onSubmit"
+              :disabled="depositState.addProductLoading"
               class="block w-full p-3 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white focus:ring-blue-500 focus:border-blue-500 outline-none transition duration-150 ease-in-out"
               placeholder="Scannez un produit"
               autocomplete="off"
@@ -237,13 +241,17 @@ const createDeposit = async () => {
           </div>
         </div>
 
-        <div v-if="errorState.productName" class="text-xl text-red-500">
-          {{ errorState.productName }} n'est pas consigné !
+        <div v-if="errorState.productName" class="text-2xl font-semibold text-red-500">
+          ⚠️ {{ errorState.productName }} n'est pas consigné !<br/>
+          Cette bouteille n'est pas reprise.<br/>
+          Merci de reprendre votre bouteille et de la déposer dans une benne dédiée au recyclage du verre
         </div>
 
-        <div v-if="errorState.reasons" class="text-xl text-red-500">
-          Une erreur semble avoir apparut :
-          {{ errorState.reasons }}
+        <div v-if="errorState.reasons" class="text-2xl font-semibold text-red-500">
+          ⚠️ Une erreur est apparue : <br/>
+          {{ errorState.reasons }} <br/>
+          Si le code-barre est correct, ce produit n'est pas vendu par SuperQuinquin. <br/>
+          Le produit n'est pas repris.
         </div>
 
         <div class="flex flex-col gap-4" v-if="depositState.returnGoods.length !== 0">
@@ -264,8 +272,8 @@ const createDeposit = async () => {
         </div>
 
         <div class="flex flex-row gap-8">
-          <button @click="onPrint" type="button">
-            <span v-if="!depositState.printTicketLoading">Imprimer le ticket</span>
+          <button @click="reveal" type="button">
+            <span v-if="!depositState.printTicketLoading">Imprimer le reçu</span>
             <svg
               v-else
               aria-hidden="true"
@@ -286,7 +294,7 @@ const createDeposit = async () => {
             </svg>
           </button>
           <button @click="onEnd" type="button">
-            <span v-if="!depositState.closeDepositLoading">Mettre fin au dépôt</span>
+            <span v-if="!depositState.closeDepositLoading">Annuler et retourner à l'accueil</span>
             <svg
               v-else
               class="animate-spin h-5 w-5"
@@ -311,6 +319,23 @@ const createDeposit = async () => {
           </button>
         </div>
       </div>
+
+      <teleport to="body">
+        <div v-if="isRevealed" class="modal-bg">
+          <div class="modal rounded-xl">
+            <h2 class="text-xl text-black p-10">Êtes vous sûr de vouloir imprimer le reçu et clôturer le
+              dépôt ?</h2>
+            <div class="flex flex-row gap-4 justify-center">
+              <button class="bg-black" @click="confirm" type="button">
+                Oui
+              </button>
+              <button class="bg-red" @click="cancel" type="button">
+                Continuer à modifier le dépôt
+              </button>
+            </div>
+          </div>
+        </div>
+      </teleport>
     </template>
   </main>
 </template>
@@ -324,6 +349,25 @@ header {
   display: block;
   margin: 0 auto 2rem;
 }
+
+.modal-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background-color: rgba(0, 0, 0, .5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal {
+  position: relative;
+  background-color: white;
+  padding: 2em 1em;
+}
+
 
 @media (min-width: 1024px) {
   header {
