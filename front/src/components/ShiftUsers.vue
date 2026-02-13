@@ -28,7 +28,7 @@ state.loading = false
 
 <template v-if="state.shiftUsers.length > 0">
   <div>
-    <h2 class="text-2xl text-black font-bold">Coopérateur du créneau</h2>
+    <h2 class="text-2xl text-black font-bold">Liste des coopérateurs en créneau</h2>
     <div class="flex w-full flex-wrap">
       <div
         class="p-2"
