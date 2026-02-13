@@ -33,7 +33,7 @@ const onSubmit = async () => {
           <SearchUser
             @select-user="selectUser"
             @confirm-user="onSubmit"
-            search-label="Sélectionner le coopérateur recevant les consignes"
+            search-label="Sélectionner le coopérateur en service à l'accueil"
             :selected-user-id="globalState.receiver?.partnerId.toString()"
           />
           <ShiftUsers
