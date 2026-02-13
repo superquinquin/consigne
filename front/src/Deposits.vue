@@ -209,7 +209,7 @@ const createDeposit = async () => {
               v-model="depositState.barcode"
               v-on:keyup.enter="onSubmit"
               :disabled="depositState.addProductLoading"
-              class="block w-full p-3 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white focus:ring-blue-500 focus:border-blue-500 outline-none transition duration-150 ease-in-out"
+              class="block w-full p-3 pl-10 text-xl text-gray-900 border border-gray-300 rounded-lg bg-white focus:ring-blue-500 focus:border-blue-500 outline-none transition duration-150 ease-in-out"
               placeholder="Scannez un produit"
               autocomplete="off"
               autofocus
@@ -279,7 +279,7 @@ const createDeposit = async () => {
 
         <div class="flex flex-row gap-8">
           <button @click="reveal" type="button">
-            <span v-if="!depositState.printTicketLoading">Imprimer le reçu</span>
+            <span class="text-xl" v-if="!depositState.printTicketLoading">Imprimer le reçu</span>
             <svg
               v-else
               aria-hidden="true"
@@ -300,7 +300,7 @@ const createDeposit = async () => {
             </svg>
           </button>
           <button @click="onEnd" type="button">
-            <span v-if="!depositState.closeDepositLoading">Annuler et retourner à l'accueil</span>
+            <span class="text-xl" v-if="!depositState.closeDepositLoading">Annuler et retourner à l'accueil</span>
             <svg
               v-else
               class="animate-spin h-5 w-5"
