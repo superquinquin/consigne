@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {inject, reactive, watch} from 'vue'
+import {inject, reactive, useTemplateRef, watch, nextTick} from 'vue'
 import type Deposit from '@/services/deposit.ts'
 import SearchUser from '@/components/SearchUser.vue'
 import type {User} from './services/users'
@@ -13,6 +13,7 @@ const depositProvider: typeof Deposit | undefined = inject('DepositProvider')
 const router = useRouter()
 const {isRevealed, reveal, confirm, cancel, onConfirm}
   = useConfirmDialog()
+const productInputRef = useTemplateRef('productInputRef')
 
 onConfirm(async () => {
   await onPrint()
@@ -112,6 +113,9 @@ const onSubmit = async (event?: KeyboardEvent) => {
 
     depositState.barcode = ''
     depositState.addProductLoading = false
+    await nextTick(()=>{
+      productInputRef.value?.focus();
+    })
   }
 }
 
@@ -208,6 +212,8 @@ const createDeposit = async () => {
               class="block w-full p-3 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white focus:ring-blue-500 focus:border-blue-500 outline-none transition duration-150 ease-in-out"
               placeholder="Scannez un produit"
               autocomplete="off"
+              autofocus
+              ref="productInputRef"
             />
             <button
               @click="() => onSubmit()"
