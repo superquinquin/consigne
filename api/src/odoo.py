@@ -154,6 +154,11 @@ class OdooSession(ContextDecorator):
     # @lru_cache(maxsize=32)
     def fuzzy_code_search(self, user_code: int) -> list[tuple[int, int, str]]:
         """have to be a browse because barcode_base is not unique, but op can be ="""
+        if user_code < 0:
+            raise ValueError("Negative value barcode_base are not allowed")
+        if user_code > 65535:
+            raise ValueError("user barcode_base larger than u16")
+
         res = self.browse("res.partner", [("barcode_base", "=", user_code), ("cooperative_state", "!=", "unsubscribed")])
         return [(r.id, r.barcode_base, r.display_name) for r in res]
 
