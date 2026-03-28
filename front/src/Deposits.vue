@@ -300,7 +300,7 @@ const createDeposit = async () => {
             </svg>
           </button>
           <button @click="onEnd" type="button">
-            <span v-if="!depositState.closeDepositLoading">Annuler et retourner à l'accueil</span>
+            <span v-if="!depositState.closeDepositLoading">Terminer et retourner à l'accueil</span>
             <svg
               v-else
               class="animate-spin h-5 w-5"
