@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {inject, reactive, useTemplateRef, watch, nextTick} from 'vue'
+import {inject, reactive, useTemplateRef, watch, nextTick, onMounted} from 'vue'
 import type Deposit from '@/services/deposit.ts'
 import SearchUser from '@/components/SearchUser.vue'
 import type {User} from './services/users'
@@ -143,10 +143,7 @@ const onEnd = async () => {
         if (status !== 200) {
           errorState.reasons = reasons
         } else {
-          globalState.depositId = undefined
-          globalState.provider = undefined
-          setGlobalState(globalState)
-          depositState.returnGoods = []
+          clearDeposit()
         }
       })
       .finally(() => (depositState.closeDepositLoading = false))
@@ -166,6 +163,42 @@ const createDeposit = async () => {
     }
   }
 }
+
+const clearDeposit = () => {
+  globalState.depositId = undefined
+  globalState.provider = undefined
+  setGlobalState(globalState)
+  depositState.returnGoods = []
+}
+
+// Reprise d'un dépôt en cours après un rafraîchissement de page.
+// Le depositId survit dans localStorage mais la liste des produits scannés
+// est un état local perdu au remontage : on la reconstruit depuis le backend,
+// seule source de vérité (les deposit_lines sont déjà persistées en base).
+const resumeDeposit = async () => {
+  if (!globalState.depositId) {
+    return
+  }
+
+  const deposit = await depositProvider?.getById(globalState.depositId.toString())
+
+  // Dépôt introuvable ou déjà clôturé : on repart d'un état propre.
+  if (!deposit || !deposit.deposit || deposit.deposit.closed) {
+    clearDeposit()
+    return
+  }
+
+  // On ne garde que les lignes actives et consignées, comme lors du scan.
+  depositState.returnGoods = (deposit.deposit_lines ?? [])
+    .filter((line) => !line.canceled && line.returnable)
+    .map((line) => ({
+      name: line.product_name,
+      isReturnable: line.returnable,
+      value: line.return_value ?? 0,
+    }))
+}
+
+onMounted(resumeDeposit)
 </script>
 
 <template>
