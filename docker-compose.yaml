@@ -1,4 +1,3 @@
-version: "3"
 services:
   consigne:
     build:
@@ -6,6 +5,11 @@ services:
       context: .
     container_name: consigne
     env_file: ./api/.env.dev
+    # In the Compose network the DB is reached via its service name, not localhost
+    # (localhost inside the container points to the container itself). Overrides
+    # DB_HOST from .env.dev, which stays set to localhost for local `boot.sh` dev.
+    environment:
+      - DB_HOST=db
     restart: always
     ports:
       - 127.0.0.1:8000:8000
@@ -50,7 +54,7 @@ services:
     - 127.0.0.1:8123:8080
     restart: always
     entrypoint:
-      [ "http-server", "dist" ]
+      [ "http-server", "dist", "--proxy", "http://localhost:8080?" ]
     depends_on:
       db:
         condition: service_healthy
