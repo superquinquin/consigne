@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {inject, reactive, useTemplateRef, watch, nextTick, onMounted} from 'vue'
 import type Deposit from '@/services/deposit.ts'
+import type { GetByIdResponse } from '@/services/deposit.ts'
 import SearchUser from '@/components/SearchUser.vue'
 import type {User} from './services/users'
 import {getGlobalState, setGlobalState} from "@/services/state.ts";
@@ -176,14 +177,22 @@ const clearDeposit = () => {
 // est un état local perdu au remontage : on la reconstruit depuis le backend,
 // seule source de vérité (les deposit_lines sont déjà persistées en base).
 const resumeDeposit = async () => {
-  if (!globalState.depositId) {
+  if (!globalState.depositId || !depositProvider) {
     return
   }
 
-  const deposit = await depositProvider?.getById(globalState.depositId.toString())
+  let deposit: GetByIdResponse | null
+  try {
+    deposit = await depositProvider.getById(globalState.depositId.toString())
+  } catch (error) {
+    // Erreur réseau/transitoire : on conserve l'état pour pouvoir reprendre
+    // le dépôt à un prochain rafraîchissement.
+    console.error('Reprise du dépôt impossible (erreur réseau) :', error)
+    return
+  }
 
-  // Dépôt introuvable ou déjà clôturé : on repart d'un état propre.
-  if (!deposit || !deposit.deposit || deposit.deposit.closed) {
+  // Dépôt introuvable (null) ou déjà clôturé : on repart d'un état propre.
+  if (!deposit || deposit.deposit?.closed) {
     clearDeposit()
     return
   }
