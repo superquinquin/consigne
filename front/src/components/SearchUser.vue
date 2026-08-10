@@ -27,12 +27,15 @@ const onSubmit = async () => {
   state.searchedTerm = search.value
 
   try {
-    const result = await userProvider
-      ?.searchUser(search.value)
-      .then((data) => data.data.matches?.map(userProvider?.parseUser))
-    // une recherche sans correspondance renvoie une liste vide : on la garde
-    // telle quelle pour pouvoir l'afficher à l'opérateur.
-    state.searchResult = result ?? []
+    const response = await userProvider?.searchUser(search.value)
+    const matches = response?.data?.matches
+
+    // `matches` absent = réponse d'erreur (elle porte quand même du JSON, donc
+    // fetch ne lève pas) ; `matches` vide = recherche aboutie sans correspondance.
+    if (!matches) {
+      throw new Error(response?.reasons ?? 'réponse inattendue')
+    }
+    state.searchResult = matches.map(userProvider!.parseUser)
   } catch {
     state.failed = true
     state.searchResult = undefined

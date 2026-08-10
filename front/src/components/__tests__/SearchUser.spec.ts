@@ -46,6 +46,17 @@ describe('SearchUser', () => {
     expect(wrapper.text()).toContain('BAGLIN')
   })
 
+  it('reports an error, not an empty result, when the api answers without matches', async () => {
+    const wrapper = mountWithMatches(() =>
+      Promise.resolve({ status: 500, reasons: 'KO', data: {} } as ApiResponse<SearchUserResponse>),
+    )
+
+    await submitSearch(wrapper, 'baglin')
+
+    expect(wrapper.text()).toContain('La recherche a échoué')
+    expect(wrapper.text()).not.toContain('Aucun coopérateur ne correspond')
+  })
+
   it('warns the operator when the search itself fails', async () => {
     const wrapper = mountWithMatches(() => Promise.reject(new Error('network down')))
 
