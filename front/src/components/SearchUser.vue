@@ -12,19 +12,31 @@ const userProvider: typeof UsersProvider | undefined = inject('UsersProvider')
 const state = reactive({
   loading: false,
   searchResult: undefined as User[] | undefined,
+  searchedTerm: '',
+  failed: false,
 })
 
 const search = ref('')
 const onSubmit = async () => {
-  state.loading = true
+  if (!search.value || state.loading) {
+    return
+  }
 
-  if (search.value) {
+  state.loading = true
+  state.failed = false
+  state.searchedTerm = search.value
+
+  try {
     const result = await userProvider
       ?.searchUser(search.value)
       .then((data) => data.data.matches?.map(userProvider?.parseUser))
-    if (result) {
-      state.searchResult = result
-    }
+    // une recherche sans correspondance renvoie une liste vide : on la garde
+    // telle quelle pour pouvoir l'afficher à l'opérateur.
+    state.searchResult = result ?? []
+  } catch {
+    state.failed = true
+    state.searchResult = undefined
+  } finally {
     state.loading = false
   }
 }
@@ -92,7 +104,22 @@ const onSubmit = async () => {
         </button>
       </div>
     </div>
-    <div class="flex flex-row gap-4 overflow-auto">
+    <p
+      v-if="!state.loading && state.failed"
+      role="alert"
+      class="p-4 text-base text-red-800 bg-red-50 border border-red-200 rounded-lg"
+    >
+      La recherche a échoué. Veuillez réessayer.
+    </p>
+    <p
+      v-else-if="!state.loading && state.searchResult?.length === 0"
+      role="status"
+      class="p-4 text-base text-amber-900 bg-amber-50 border border-amber-200 rounded-lg"
+    >
+      Aucun coopérateur ne correspond à «&nbsp;{{ state.searchedTerm }}&nbsp;». Vérifiez
+      l'orthographe ou essayez avec le numéro de coopérateur.
+    </p>
+    <div v-else class="flex flex-row gap-4 overflow-auto">
       <div
         class="p-2"
         v-for="item in state.searchResult"
