@@ -17,4 +17,16 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  // Dev-only: proxy /api to the local API so browser requests stay same-origin
+  // (no CORS). Mirrors prod, where the reverse proxy routes /api to the backend.
+  // The API serves its routes at the root, so we strip the /api prefix here.
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
 })

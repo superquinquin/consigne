@@ -38,13 +38,14 @@ export default {
     return response.json().then(({ data }: ApiResponse<CreateResponse>) => data)
   },
 
-  getById: async function (depositId: string): Promise<GetByIdResponse> {
+  getById: async function (depositId: string): Promise<GetByIdResponse | null> {
     const response = await fetch(`${API_ADDRESS}/deposit/${depositId}`, {
       method: 'GET',
       headers: { 'content-type': 'application/json;charset=UTF-8' },
     })
 
-    return response.json().then(({ data }: ApiResponse<GetByIdResponse>) => data)
+    // The backend returns `data: null` when the deposit is unknown.
+    return response.json().then(({ data }: ApiResponse<GetByIdResponse | null>) => data)
   },
 
   getByIdAndLineId: async function (
