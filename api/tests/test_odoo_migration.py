@@ -142,18 +142,22 @@ class TestCredentials:
         monkeypatch.delenv("ERP_API_KEY", raising=False)
         assert OdooConnector.credentials() == ("api", "pw", None)
 
-    def test_api_key_takes_precedence_and_blanks_the_password(self, monkeypatch):
+    def test_api_key_is_sent_in_the_password_slot(self, monkeypatch):
+        """Odooly only honours its own api_key argument on Odoo >= 19; below
+        that it authenticates with `password` alone and discards the key. So
+        the key must occupy the password slot, or it never reaches the wire."""
         monkeypatch.setenv("ERP_USERNAME", "api")
         monkeypatch.setenv("ERP_PASSWORD", "pw")
         monkeypatch.setenv("ERP_API_KEY", "key123")
-        # passing both would let Odooly fall back to the password silently
-        assert OdooConnector.credentials() == ("api", None, "key123")
+        user, password, api_key = OdooConnector.credentials()
+        assert (user, password) == ("api", "key123")   # key, NOT "pw"
+        assert api_key == "key123"
 
     def test_api_key_alone_is_sufficient(self, monkeypatch):
         monkeypatch.setenv("ERP_USERNAME", "api")
         monkeypatch.delenv("ERP_PASSWORD", raising=False)
         monkeypatch.setenv("ERP_API_KEY", "key123")
-        assert OdooConnector.credentials() == ("api", None, "key123")
+        assert OdooConnector.credentials() == ("api", "key123", "key123")
 
     def test_missing_both_secrets_raises(self, monkeypatch):
         monkeypatch.setenv("ERP_USERNAME", "api")

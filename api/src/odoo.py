@@ -127,7 +127,7 @@ class OdooConnector(object):
             raise ValueError(
                 "ERP_USERNAME and one of ERP_PASSWORD / ERP_API_KEY must be set"
             )
-        return (username, None if api_key else password, api_key)
+        return (username, api_key or password, api_key)
 
     def make_session(self, max_retries: int = 5, retries_interval: int = 5) -> OdooSession:
         username, password, api_key = self.credentials()
