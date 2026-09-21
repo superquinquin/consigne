@@ -37,6 +37,25 @@ def normalize_conditions(conditions: Conditions) -> Conditions:
     return [_jsonable(clause) for clause in conditions]
 
 
+def field(record: Record, name: str) -> Any:
+    """Read a field, refusing Odooly's silent method fallback.
+
+    ``Record.__getattr__`` never raises for an unknown field: anything not in
+    ``_model._keys`` is assumed to name an Odoo model *method* and comes back
+    as a bound callable. So a field renamed between Odoo versions -- or one
+    whose addon is not installed -- yields a method object instead of an
+    error, and that object flows on into the ledger and into the EAN13 that
+    encodes the refund amount. Reading through this helper turns that silent
+    corruption into an immediate AttributeError.
+    """
+    if name not in record._model._keys:
+        raise AttributeError(
+            f"model {record._model._name!r} has no field {name!r} on this Odoo "
+            f"instance (Odooly would have returned a bound method here)"
+        )
+    return getattr(record, name)
+
+
 Zone = tuple[datetime | None, datetime | None]
 
 
@@ -179,16 +198,16 @@ class OdooSession(ContextDecorator):
         returnability of the product (bool) 
         and the it's associated return_product (Record of product.product)
         """
-        tmpl = product.product_tmpl_id
-        return (tmpl.returnable, tmpl.return_product_id or None)
+        tmpl = field(product, "product_tmpl_id")
+        return (field(tmpl, "returnable"), field(tmpl, "return_product_id") or None)
 
     def product_to_record(self, product: Record) -> tuple:
-        tmpl = product.product_tmpl_id
-        return (product.id, tmpl.name, product.barcode)
+        tmpl = field(product, "product_tmpl_id")
+        return (product.id, field(tmpl, "name"), field(product, "barcode"))
 
     def product_return_to_record(self, product_return: Record) -> tuple:
-        tmpl = product_return.product_tmpl_id
-        return (product_return.id, tmpl.name, True, tmpl.list_price)
+        tmpl = field(product_return, "product_tmpl_id")
+        return (product_return.id, field(tmpl, "name"), True, field(tmpl, "list_price"))
 
     def auth_provider(self, username: str, password: str) -> tuple[bool, Record|None]:
         """Validate an operator's credentials on a throwaway client.
@@ -210,8 +229,8 @@ class OdooSession(ContextDecorator):
         return (True, user)
 
     def user_to_record(self, user: Record) -> tuple:
-        partner = user.partner_id
-        return (partner.id, partner.barcode_base, partner.name)
+        partner = field(user, "partner_id")
+        return (partner.id, field(partner, "barcode_base"), field(partner, "name"))
     
     def get_partner_record_from_code(self, code: int) -> list[tuple]:
         partners = self.search("res.partner", [("barcode_base", "=", code), ("cooperative_state", "!=", "unsubscribed")])
@@ -265,7 +284,12 @@ class OdooSession(ContextDecorator):
         return self.search("pos.order.line", [("product_id.barcode_base", "in", bases), ("create_date", ">=", after), ("create_date", "<", before)])
         
     def pos_order_line_to_record(self, record: Record) -> tuple:
-        return (record.order_id.id, record.create_date, record.price_unit, record.product_id.barcode)
+        return (
+            field(record, "order_id").id,
+            field(record, "create_date"),
+            field(record, "price_unit"),
+            field(field(record, "product_id"), "barcode"),
+        )
     
     def get_existing_consigne_barcodes(self) -> list[tuple]:
         product_cat = self.get("product.category", [("name", "=", "Consigne_product")])

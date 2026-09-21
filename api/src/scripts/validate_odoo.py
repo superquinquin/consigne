@@ -26,18 +26,28 @@ from src.odoo import OdooConnector
 # models -> fields the consigne app depends on. Most live in foodcoop addons
 # (shift.*, barcode_base, cooperative_state), not in core Odoo, so they are
 # the real portability risk across a major version jump.
-REQUIRED: dict[str, list[str]] = {
-    "res.partner":      ["barcode_base", "cooperative_state", "display_name"],
-    "res.users":        ["partner_id"],
-    "product.product":  ["barcode", "product_tmpl_id"],
-    "product.template": ["returnable", "return_product_id", "list_price",
-                         "categ_id", "sale_ok", "purchase_ok", "uom_id",
-                         "available_in_pos", "fiscal_classification_id",
-                         "barcode_base"],
-    "product.category": ["name", "parent_id"],
-    "shift.shift":      ["date_begin_tz", "date_end_tz", "shift_type_id"],
-    "shift.registration": ["shift_id", "partner_id"],
-    "pos.order.line":   ["order_id", "price_unit", "product_id", "create_date"],
+# Fields the consigne app reads, tagged by origin:
+#   "core"  -> ships with Odoo. Missing = a genuine incompatibility.
+#   "addon" -> foodcoop/louve addons. Missing on a vanilla instance is
+#              EXPECTED and says nothing about the migration; missing on the
+#              real staging box means the addon is absent or renamed.
+REQUIRED: dict[str, dict[str, str]] = {
+    "res.partner":        {"display_name": "core", "barcode_base": "addon",
+                           "cooperative_state": "addon"},
+    "res.users":          {"partner_id": "core"},
+    "product.product":    {"barcode": "core", "product_tmpl_id": "core"},
+    "product.template":   {"list_price": "core", "categ_id": "core",
+                           "sale_ok": "core", "purchase_ok": "core",
+                           "uom_id": "core", "available_in_pos": "core",
+                           "returnable": "addon", "return_product_id": "addon",
+                           "fiscal_classification_id": "addon",
+                           "barcode_base": "addon"},
+    "product.category":   {"name": "core", "parent_id": "core"},
+    "shift.shift":        {"date_begin_tz": "addon", "date_end_tz": "addon",
+                           "shift_type_id": "addon"},
+    "shift.registration": {"shift_id": "addon", "partner_id": "addon"},
+    "pos.order.line":     {"order_id": "core", "price_unit": "core",
+                           "product_id": "core", "create_date": "core"},
 }
 
 DB_CANDIDATES = [
@@ -107,18 +117,33 @@ def main() -> int:
 
     # --- 2. schema compatibility (cheap, and the real Odoo-18 risk)
     print("\n== models / fields required by the consigne app ==")
-    missing_total = 0
+    core_gaps: list[str] = []
+    addon_gaps: list[str] = []
     for model, fields in REQUIRED.items():
         try:
             present = set(client.env[model].keys())
-        except Exception as exc:
-            print(f"  MODEL MISSING  {model:22} ({type(exc).__name__})")
-            missing_total += 1 + len(fields)
+        except Exception:
+            origin = "addon" if all(o == "addon" for o in fields.values()) else "core"
+            (addon_gaps if origin == "addon" else core_gaps).append(f"{model} (whole model)")
+            print(f"  {'--' if origin == 'addon' else 'XX'}   {model:22} model absent [{origin}]")
             continue
-        missing = [f for f in fields if f not in present]
-        missing_total += len(missing)
-        status = "ok" if not missing else f"MISSING {missing}"
-        print(f"  {'ok ' if not missing else 'DIFF'}  {model:22} {status}")
+        miss_core = [f for f, o in fields.items() if o == "core" and f not in present]
+        miss_addon = [f for f, o in fields.items() if o == "addon" and f not in present]
+        core_gaps += [f"{model}.{f}" for f in miss_core]
+        addon_gaps += [f"{model}.{f}" for f in miss_addon]
+        if not miss_core and not miss_addon:
+            print(f"  ok   {model:22} all present")
+        else:
+            bits = []
+            if miss_core:
+                bits.append(f"CORE missing {miss_core}")
+            if miss_addon:
+                bits.append(f"addon missing {miss_addon}")
+            print(f"  {'XX' if miss_core else '--'}   {model:22} {' | '.join(bits)}")
+
+    print(f"\n  core gaps  : {len(core_gaps)} {core_gaps if core_gaps else ''}")
+    print(f"  addon gaps : {len(addon_gaps)} (expected on an instance without the foodcoop addons)")
+    missing_total = len(core_gaps)
 
     # --- 3. read-only behaviour of the migrated session
     print("\n== migrated OdooSession methods (read-only) ==")
