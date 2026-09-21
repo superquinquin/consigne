@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import random
 from pathlib import Path
-from erppeek import Client, Record
+from odooly import Client, Record
 from dataclasses import dataclass, field, asdict
 from collections import deque
 from functools import reduce
@@ -14,7 +14,7 @@ from typing import Any, Generator
 
 
 from src.loaders import ConfigLoader
-from src.odoo import OdooSession
+from src.odoo import OdooConnector, OdooSession
 from src.database import ConsigneDatabase
 
 PARENT_CAT = "Consigne"
@@ -77,8 +77,8 @@ class BuildingDatabase(ConsigneDatabase):
             session.commit()
 
 class BuildingOdoo(OdooSession):
-    def __init__(self, client):
-        super().__init__(client)
+    def __init__(self, client, connector):
+        super().__init__(client, connector)
 
     def create_consigne_cat(self) -> tuple[Record, Record, Record]: 
         parent_cat = self.get("product.category", [("name","=", PARENT_CAT)])
@@ -86,21 +86,21 @@ class BuildingOdoo(OdooSession):
         return_cat = self.get("product.category", [("name","=", RETURN_CAT)])
 
         if parent_cat is None:
-            parent_cat = self.client.model("product.category").create({
+            parent_cat = self.client.env["product.category"].create({
                 "parent_id": None,
                 "name": "Consigne",
                 "type": "normal"
             })
 
         if product_cat is None:
-            product_cat = self.client.model("product.category").create({
+            product_cat = self.client.env["product.category"].create({
                 "parent_id": parent_cat.id,
                 "name": "Consigne_product",
                 "type": "normal"
             })
 
         if return_cat is None:
-            return_cat = self.client.model("product.category").create({
+            return_cat = self.client.env["product.category"].create({
                 "parent_id": parent_cat.id,
                 "name": "Consigne_return",
                 "type": "normal"
@@ -112,7 +112,7 @@ class BuildingOdoo(OdooSession):
 
         if p is None:
             print("CREATING PRODUCT")
-            r = self.client.model("product.product").create({"name": product.name})
+            r = self.client.env["product.product"].create({"name": product.name})
             tmpl = r.product_tmpl_id
             for k,v in product.product_payload().items():
                 setattr(tmpl, k, v)
@@ -122,7 +122,7 @@ class BuildingOdoo(OdooSession):
         
         if p is None:
             print("CREATING RETURNS")
-            r = self.client.model("product.product").create({"name": product.name})
+            r = self.client.env["product.product"].create({"name": product.name})
             tmpl = r.product_tmpl_id
             for k,v in product.return_payload().items():
                 setattr(tmpl, k, v)
@@ -143,7 +143,7 @@ class BuildingOdoo(OdooSession):
             p.product_tmpl_id.returnable = False
 
     def get_existing_consigne_barcodes(self, product_cat_id:int) -> list[tuple]:
-        return [(r.barcode_base, r.barcode) for r in self.browse("product.product", [("product_tmpl_id.categ_id.id", "=", product_cat_id)])]
+        return [(r.barcode_base, r.barcode) for r in self.search("product.product", [("product_tmpl_id.categ_id.id", "=", product_cat_id)])]
 
 
 class BarcodeGenerator(object):
@@ -240,7 +240,7 @@ class Builder(object):
         returnables = taxonomy.get("returnables", [])
         
         
-        odoo = BuildingOdoo(cls._make_client(**erp_cfg))
+        odoo = BuildingOdoo(*cls._make_client(**erp_cfg))
         database = BuildingDatabase(**database_cfg)
         return cls(odoo, database, returns, products, returnables)
 
@@ -286,7 +286,11 @@ class Builder(object):
         return [Product(**x, categ_id=categ_id) for x in self.returns]
 
     @staticmethod
-    def _make_client(host: str, database: str, login: str, password: str,  verbose: bool=False) -> Client:
-        client = Client(host, verbose=verbose)
-        client.login(login, password=password, database=database)
-        return client
+    def _make_client(
+        host: str, database: str, login: str, password: str, verbose: bool = False
+    ) -> tuple[Client, OdooConnector]:
+        """Build the client through the connector, so the Basic-auth userinfo
+        is injected the same way the running API does it."""
+        connector = OdooConnector(host=host, database=database, verbose=verbose)
+        client = Client(connector.url, database, login, password, verbose=verbose)
+        return (client, connector)
