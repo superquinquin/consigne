@@ -13,6 +13,7 @@ what the defences count.
 from __future__ import annotations
 
 import argparse
+import difflib
 import os
 import re
 import sys
@@ -54,6 +55,20 @@ DB_CANDIDATES = [
     "superquinquin_staging", "superquinquin_staging18", "superquinquin18_staging",
     "superquinquin_18_staging", "superquinquin", "superquinquin18",
 ]
+
+
+def rename_candidates(missing: str, present: set[str], limit: int = 4) -> list[str]:
+    """Field names on the instance that could be `missing` under another name.
+
+    A port of the foodcoop addons from a different lineage renames rather than
+    removes. Since Odooly returns a bound method for an unknown field instead
+    of raising, a rename is invisible at runtime -- so the single staging pass
+    must surface the candidates, not merely report an absence.
+    """
+    stem = missing.rsplit("_", 1)[0] if "_" in missing else missing
+    substring = sorted(f for f in present if stem and stem in f and f != missing)
+    fuzzy = difflib.get_close_matches(missing, present - set(substring), n=limit, cutoff=0.6)
+    return (substring + fuzzy)[:limit]
 
 
 def discover_db(url: str) -> list[str]:
@@ -129,6 +144,10 @@ def main() -> int:
             continue
         miss_core = [f for f, o in fields.items() if o == "core" and f not in present]
         miss_addon = [f for f, o in fields.items() if o == "addon" and f not in present]
+        for f in miss_core + miss_addon:
+            cands = rename_candidates(f, present)
+            if cands:
+                print(f"       ? {model}.{f} absent -- similar fields present: {cands}")
         core_gaps += [f"{model}.{f}" for f in miss_core]
         addon_gaps += [f"{model}.{f}" for f in miss_addon]
         if not miss_core and not miss_addon:
