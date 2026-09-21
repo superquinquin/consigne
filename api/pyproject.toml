@@ -39,6 +39,12 @@ omit = ["tests/*"]
 requires = ["setuptools == 66.1.1"]
 build-backend = "setuptools.build_meta"
 
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src", "src.*"]
