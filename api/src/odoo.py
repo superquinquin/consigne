@@ -92,22 +92,45 @@ class OdooConnector(object):
         userinfo = f"{quote(str(user), safe='')}:{quote(str(password), safe='')}"
         return urlunsplit((split.scheme, f"{userinfo}@{host}", split.path, split.query, split.fragment))
 
-    def make_session(self, max_retries: int = 5, retries_interval: int = 5) -> OdooSession:
+    @staticmethod
+    def credentials() -> tuple[str, str | None, str | None]:
+        """(user, password, api_key).
+
+        Odoo 14+ supports API keys, and deployments commonly disable password
+        authentication for external RPC while keeping it for the web UI --
+        which fails with "Invalid username or password" on credentials that
+        are perfectly valid. Setting ERP_API_KEY switches to key auth.
+        """
         username = os.environ.get("ERP_USERNAME", None)
+        api_key = os.environ.get("ERP_API_KEY", None)
         password = os.environ.get("ERP_PASSWORD", None)
-        if not all([username, password]):
-            raise ValueError("ERP_USERNAME and/or ERP_PASSWORD ENV variables not found")
+        if username is None or not any([password, api_key]):
+            raise ValueError(
+                "ERP_USERNAME and one of ERP_PASSWORD / ERP_API_KEY must be set"
+            )
+        return (username, None if api_key else password, api_key)
+
+    def make_session(self, max_retries: int = 5, retries_interval: int = 5) -> OdooSession:
+        username, password, api_key = self.credentials()
         
-        success, tries = False, 0
+        success, tries, last_error = False, 0, None
         while (success is False and tries <= max_retries):
             try:
-                client = Client(self.url, self.database, username, password, verbose=self.verbose)
+                client = Client(
+                    self.url, self.database, username, password,
+                    api_key=api_key, verbose=self.verbose,
+                )
                 success = True
                 return OdooSession(client, self)
-            except Exception:
+            except Exception as exc:
+                last_error = exc
                 time.sleep(retries_interval)
                 tries += 1
-        raise ConnectionError("Unable to generate an Odoo Session")
+        # Surface the cause: a rejected password and an unreachable host are
+        # otherwise indistinguishable after five silent retries.
+        raise ConnectionError(
+            f"Unable to generate an Odoo Session: {type(last_error).__name__}: {last_error}"
+        ) from last_error
         
 
 class OdooSession(ContextDecorator):
@@ -139,12 +162,10 @@ class OdooSession(ContextDecorator):
         return self.client.env[model].search(normalize_conditions(conditions))
 
     def renew_session(self) -> None:
-        username = os.environ.get("ERP_USERNAME", None)
-        password = os.environ.get("ERP_PASSWORD", None)
-        if not all([username, password]):
-            raise ValueError("ERP_USERNAME or ERP_PASSWORD env variables not found")
+        username, password, api_key = self.connector.credentials()
         client = Client(
-            self.connector.url, self.client.env.db_name, username, password, verbose=False
+            self.connector.url, self.client.env.db_name, username, password,
+            api_key=api_key, verbose=False,
         )
         self.client = client
 
