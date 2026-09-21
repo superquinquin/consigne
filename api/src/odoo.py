@@ -6,7 +6,8 @@ from contextlib import ContextDecorator
 from datetime import datetime, timedelta
 from functools import wraps, lru_cache
 from http.client import CannotSendRequest
-from erppeek import Client, Record, RecordList, Model
+from urllib.parse import urlsplit, urlunsplit, quote
+from odooly import Client, Record, RecordList, Model
 
 from typing import Callable, Any
 
@@ -14,6 +15,28 @@ from typing import Callable, Any
 # pyright: reportFunctionMemberAccess=false
 
 Conditions = list[tuple[str, str, Any]]
+
+
+def _jsonable(value: Any) -> Any:
+    """Make a domain value safe for Odooly's JSON-RPC transport.
+
+    ErpPeek spoke XML-RPC, which marshalled ``datetime`` natively. Odooly
+    serialises the domain with ``json.dumps``, which raises TypeError on a
+    ``datetime`` -- so datetimes are converted to the ISO strings Odoo
+    expects. Applied at the session seam rather than at each call site, so
+    callers may keep passing datetimes.
+    """
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, (list, tuple)):
+        return type(value)(_jsonable(v) for v in value)
+    return value
+
+
+def normalize_conditions(conditions: Conditions) -> Conditions:
+    return [_jsonable(clause) for clause in conditions]
+
+
 Zone = tuple[datetime | None, datetime | None]
 
 
@@ -51,6 +74,24 @@ class OdooConnector(object):
         self.database = database
         self.verbose = verbose
 
+    @property
+    def url(self) -> str:
+        """Server URL, carrying HTTP Basic credentials as userinfo when the
+        instance sits behind a protected reverse proxy (Trobz staging).
+
+        Odooly reads the credentials straight off the URL; they must be
+        re-injected on every Client construction, because Odooly strips the
+        userinfo from ``client._server`` once connected.
+        """
+        user = os.environ.get("ERP_BASIC_USER", None)
+        password = os.environ.get("ERP_BASIC_PASSWORD", None)
+        if not all([user, password]):
+            return self.host
+        split = urlsplit(self.host)
+        host = split.netloc.rsplit("@", 1)[-1]
+        userinfo = f"{quote(str(user), safe='')}:{quote(str(password), safe='')}"
+        return urlunsplit((split.scheme, f"{userinfo}@{host}", split.path, split.query, split.fragment))
+
     def make_session(self, max_retries: int = 5, retries_interval: int = 5) -> OdooSession:
         username = os.environ.get("ERP_USERNAME", None)
         password = os.environ.get("ERP_PASSWORD", None)
@@ -60,10 +101,9 @@ class OdooConnector(object):
         success, tries = False, 0
         while (success is False and tries <= max_retries):
             try:
-                client = Client(self.host, verbose=self.verbose)
-                client.login(username, password=password, database=self.database)
+                client = Client(self.url, self.database, username, password, verbose=self.verbose)
                 success = True
-                return OdooSession(client)
+                return OdooSession(client, self)
             except Exception:
                 time.sleep(retries_interval)
                 tries += 1
@@ -72,9 +112,11 @@ class OdooConnector(object):
 
 class OdooSession(ContextDecorator):
     client: Client
+    connector: "OdooConnector"
 
-    def __init__(self, client: Client):
+    def __init__(self, client: Client, connector: "OdooConnector"):
         self.client = client
+        self.connector = connector
 
     def __enter__(self):
         return self
@@ -84,19 +126,26 @@ class OdooSession(ContextDecorator):
 
     @resilient(degree=3)
     def get(self, model: str, conditions: Conditions) -> Record | None:
-        return self.client.model(model).get(conditions)
+        return self.client.env[model].get(normalize_conditions(conditions))
 
     @resilient(degree=3)
-    def browse(self, model: str, conditions: Conditions) -> Record | RecordList:
-        return self.client.model(model).browse(conditions)
+    def search(self, model: str, conditions: Conditions) -> RecordList:
+        """Records matching a domain.
+
+        Odooly's ``Model.browse()`` only accepts ids -- handing it a domain
+        raises AssertionError -- so a domain lookup goes through ``search()``,
+        which returns a RecordList.
+        """
+        return self.client.env[model].search(normalize_conditions(conditions))
 
     def renew_session(self) -> None:
         username = os.environ.get("ERP_USERNAME", None)
         password = os.environ.get("ERP_PASSWORD", None)
         if not all([username, password]):
             raise ValueError("ERP_USERNAME or ERP_PASSWORD env variables not found")
-        client = Client(self.client._server, verbose=False)
-        client.login(username, password=password, database=self.client._db)
+        client = Client(
+            self.connector.url, self.client.env.db_name, username, password, verbose=False
+        )
         self.client = client
 
     def get_product_from_barcode(self, barcode: str) -> Record | None:
@@ -121,11 +170,22 @@ class OdooSession(ContextDecorator):
         return (product_return.id, tmpl.name, True, tmpl.list_price)
 
     def auth_provider(self, username: str, password: str) -> tuple[bool, Record|None]:
-        c = Client(self.client._server, verbose=False)
-        auth = c._auth(self.client._db, username, password)
-        if auth[0] is False:
+        """Validate an operator's credentials on a throwaway client.
+
+        Odooly exposes no non-mutating credential check here: ``client.common``
+        is None whenever the server URL has no ``/jsonrpc`` path, and
+        ``Client.login()`` swaps ``self.env`` in place -- so authenticating on
+        the service client would re-bind this session to the operator.
+        """
+        try:
+            c = Client(
+                self.connector.url, self.client.env.db_name, username, password, verbose=False
+            )
+        except Exception:
             return (False, None)
-        user = self.get("res.users", [("id", "=", auth[0])])
+        if not c.env.uid:
+            return (False, None)
+        user = self.get("res.users", [("id", "=", c.env.uid)])
         return (True, user)
 
     def user_to_record(self, user: Record) -> tuple:
@@ -133,7 +193,7 @@ class OdooSession(ContextDecorator):
         return (partner.id, partner.barcode_base, partner.name)
     
     def get_partner_record_from_code(self, code: int) -> list[tuple]:
-        partners = self.browse("res.partner", [("barcode_base", "=", code), ("cooperative_state", "!=", "unsubscribed")])
+        partners = self.search("res.partner", [("barcode_base", "=", code), ("cooperative_state", "!=", "unsubscribed")])
         return [(partner.id, partner.barcode_base, partner.name) for partner in partners]
     
     def get_partner_record_from_id(self, partner_id: int) -> tuple | None:
@@ -159,18 +219,18 @@ class OdooSession(ContextDecorator):
         if user_code > 65535:
             raise ValueError("user barcode_base larger than u16")
 
-        res = self.browse("res.partner", [("barcode_base", "=", user_code), ("cooperative_state", "!=", "unsubscribed")])
+        res = self.search("res.partner", [("barcode_base", "=", user_code), ("cooperative_state", "!=", "unsubscribed")])
         return [(r.id, r.barcode_base, r.display_name) for r in res]
 
     # @lru_cache(maxsize=32)
     def fuzzy_name_search(self, name: str) -> list[tuple[int, int, str]]:
-        res = self.browse("res.partner", [("name", "ilike", name), ("cooperative_state", "!=", "unsubscribed")])
+        res = self.search("res.partner", [("name", "ilike", name), ("cooperative_state", "!=", "unsubscribed")])
         return [(r.id, r.barcode_base, r.display_name) for r in res[:FZ_LIMIT]]
 
     def get_current_shift_end_time_dist(self) -> int|None:
         """return dist from current shift end time in seconds"""
         dt_day = datetime.now().replace(hour=0)
-        shifts = self.browse("shift.shift", [("date_begin_tz", ">", dt_day), ("date_begin_tz", "<", datetime.now())])
+        shifts = self.search("shift.shift", [("date_begin_tz", ">", dt_day), ("date_begin_tz", "<", datetime.now())])
         if len(shifts) == 0:
             return None
         current = shifts[-1]
@@ -181,7 +241,7 @@ class OdooSession(ContextDecorator):
 
     def get_redeemed_tickets(self, bases: list[str], before: datetime, after: datetime) -> list[Record]:
         """research specific barcodes in pos.order_lines before and after certain dates. return matched records"""
-        return self.browse("pos.order.line", [("product_id.barcode_base", "in", bases), ("create_date", ">=", after), ("create_date", "<", before)])
+        return self.search("pos.order.line", [("product_id.barcode_base", "in", bases), ("create_date", ">=", after), ("create_date", "<", before)])
         
     def pos_order_line_to_record(self, record: Record) -> tuple:
         return (record.order_id.id, record.create_date, record.price_unit, record.product_id.barcode)
@@ -191,7 +251,7 @@ class OdooSession(ContextDecorator):
         if product_cat is None:
             raise ValueError("Setup Odoo consigne taxonomies first.")
         product_cat_id = product_cat.id
-        return [(str(r.barcode_base), r.barcode, r.name, r.sale_ok) for r in self.browse("product.product", [("product_tmpl_id.categ_id.id", "=", product_cat_id)])]
+        return [(str(r.barcode_base), r.barcode, r.name, r.sale_ok) for r in self.search("product.product", [("product_tmpl_id.categ_id.id", "=", product_cat_id)])]
 
     def get_current_shifts(self) -> RecordList:
         SHIFT_WINDOW_FLOOR = int(os.environ.get("SHIFT_WINDOW_FLOOR", 15))
@@ -199,7 +259,7 @@ class OdooSession(ContextDecorator):
 
         begin = (datetime.now() - SHIFT_LEN - timedelta(minutes=SHIFT_WINDOW_FLOOR)).isoformat()
         end = (datetime.now() + timedelta(minutes=SHIFT_WINDOW_CEILING)).isoformat()
-        shifts = self.browse("shift.shift", [("date_begin_tz", ">=", begin), ("date_begin_tz", "<=", end), ("shift_type_id.id", "=", 1)])
+        shifts = self.search("shift.shift", [("date_begin_tz", ">=", begin), ("date_begin_tz", "<=", end), ("shift_type_id.id", "=", 1)])
         return shifts
 
     def get_shift_zone(self, shifts: RecordList) -> tuple[datetime | None, datetime | None]:
@@ -228,7 +288,7 @@ class OdooSession(ContextDecorator):
     def get_shifts_members(self, shifts: RecordList) -> list[tuple[int, int, str]]:
         current_members = []
         for shift in shifts:
-            members = self.browse("shift.registration", [("shift_id", "=", shift.id)])
+            members = self.search("shift.registration", [("shift_id", "=", shift.id)])
             current_members.extend([(r.partner_id.id, r.partner_id.barcode_base, r.partner_id.display_name) for r in members])
 
         current_members = sorted(current_members, key= lambda x: x[1])
