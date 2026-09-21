@@ -193,6 +193,84 @@ dans `OCA/product-attribute` et `OCA/stock-logistics-workflow`.
 faire, pas d'une installation. Le module est petit : un booléen et un
 many2one sur `product.template`, plus les vues.
 
+### A-t-on encore besoin de ces champs en Odoo 18 ?
+
+Question posée le 2026-09-21. Réponse : **oui au modèle de données, non à ce
+module précis.**
+
+L'app doit répondre, pour un code-barres scanné : ce produit porte-t-il une
+consigne, et quelle valeur rembourse-t-on. Il n'y a pas de contournement.
+
+#### État de l'écosystème (vérifié par l'API GitHub, pas par recherche)
+
+| Module | 16.0 | 17.0 | 18.0 |
+|---|---|---|---|
+| `sale_product_returnable` *(OCA/sale-workflow, actuel)* | non | non | non *(12.0 seulement)* |
+| `pos_container_deposit` *(OCA/pos)* | **oui** | non | non |
+| `pos_product_packaging_container_deposit` *(OCA/pos)* | **oui** | non | non |
+| `product_packaging_container_deposit` *(OCA/product-attribute)* | **oui** | non | non |
+| `purchase_product_packaging_container_deposit` *(OCA/purchase-workflow)* | **oui** | non | non |
+
+**Tout l'écosystème OCA de la consigne s'arrête en 16.0.**
+
+#### Alternatives hors OCA
+
+- [`product_deposit_management`](https://apps.odoo.com/apps/modules/18.0/product_deposit_management)
+  (CandidRoot) — **la seule offre en 18.0**. Écartée : dépendances
+  `account, sale_management, mail, purchase, stock`, **pas de
+  `point_of_sale`**. Or toute la boucle se referme au POS, où le coopérateur
+  scanne l'EAN13 du ticket. Propriétaire (OPL-1), 43,29 €.
+- [`product_container_deposit_omax`](https://apps.odoo.com/apps/modules/19.0/product_container_deposit_omax)
+  — gère le POS, mais n'existe qu'en **19.0**.
+- Astuce « groupe de taxe Consigne » des forums — modélise la consigne
+  **encaissée à la vente**. L'app traite l'autre bout, le **retour** au
+  comptoir. Hors sujet.
+
+#### Champs natifs Odoo 18 envisageables
+
+Aucun ne convient sémantiquement : `accessory_product_ids`,
+`optional_product_ids` et `alternative_product_ids` sont des ventes
+additionnelles — le produit de consigne remonterait en devis et en boutique.
+`product_tag_ids` et `packaging_ids` ne portent pas la relation voulue.
+
+#### Options et recommandation
+
+| Option | Travail | Changement côté app |
+|---|---|---|
+| **A.** Porter `sale_product_returnable` en 18.0 | manifest, vues, tests, i18n — et OCA l'a abandonné, donc vous le maintenez de toute façon | aucun |
+| **B.** Les deux champs dans `custom_superquin` | deux champs + héritage de vue | aucun |
+| **C.** Changer de modèle (tag, ou float `consigne_value`) | plus léger côté Odoo | réécrire `get_product_return` et `set_to_returnable` |
+
+**Recommandé : B.** `custom_superquin` est déjà installé sur foodcoop18.
+L'option B est strictement un sous-ensemble de A pour un résultat identique,
+avec les mêmes noms de champs — donc **zéro modification de la migration
+validée**. Et c'est de la logique métier SuperQuinquin, pas une
+fonctionnalité OCA générique.
+
+Simplification possible : `returnable` est redondant, un `return_product_id`
+non nul suffit à dire qu'un produit est consigné. Un seul many2one suffirait,
+au prix d'une retouche de `get_product_return()`.
+
+Pour plus tard : si un modèle plus riche devient souhaitable (suivi des
+contenants, soldes par coopérateur), la famille OCA `*_container_deposit` en
+**16.0** est un point de départ bien plus proche qu'un portage depuis la 12.0
+— deux versions d'écart au lieu de six. Mais cela suppose de réécrire
+l'interface Odoo de l'app.
+
+### Anomalie de données repérée
+
+Parmi les 5 produits de retour migrés en catégorie `Consigne_return` :
+
+```
+Consigne valeur 0.5    list_price = 0.35
+```
+
+Le nom annonce 0,50 € et le prix vaut 0,35 €. L'app lit `list_price` comme
+valeur de remboursement et affiche le nom aux humains : un ticket
+rembourserait donc 0,35 € là où tout le monde lit 0,50 €. Peut-être
+délibéré (valeur revue sans renommer), mais cela touche à de l'argent — **à
+faire confirmer avant mise en service**, indépendamment des points 1 à 3.
+
 ---
 
 ## Ce qui est bien porté en Odoo 18
