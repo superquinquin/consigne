@@ -6,6 +6,14 @@ truncated run still yields the most valuable answers. A failed
 authentication is never retried -- repeating it adds no information and is
 what the defences count.
 
+IMPORTANT -- endpoint. On an instance whose `session_info()` is broken by an
+addon, `/web/session/authenticate` returns a server error that Odooly swallows
+(`except ServerError: if code not in (0, 200)`) and reports as "Invalid
+username or password". Point ERP_URL at the `/jsonrpc` endpoint instead: it
+does not build `session_info`, so it bypasses the fault. Observed on a
+staging instance where `base_import_security_group` raised
+`'NoneType' object has no attribute 'ref'` during session_info().
+
     python -m src.scripts.validate_odoo                 # uses $ERP_URL / $ERP_DB
     python -m src.scripts.validate_odoo --host URL --db NAME
     python -m src.scripts.validate_odoo --discover-db   # probe db candidates
